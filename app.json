@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "Fair Scanner",
+    "slug": "fairscanner",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "package": "com.fairscanner.app",
+      "permissions": [
+        "android.permission.VIBRATE",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
+      ],
+      "intentFilters": [
+        {
+          "action": "com.fairscanner.BARCODE",
+          "category": [
+            "android.intent.category.DEFAULT"
+          ],
+          "data": {
+            "scheme": "fairscanner"
+          }
+        }
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "scheme": "fairscanner",
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "d1ba345b-c30e-4e17-bcc6-f31458e4afe8"
+      }
+    },
+    "owner": "hansarne"
+  }
+}
