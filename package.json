@@ -1,7 +1,7 @@
 {
   "name": "fair-scanner",
   "version": "1.0.0",
-  "main": "expo-router/entry",
+  "main": "App.js",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
@@ -14,10 +14,12 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
     "expo": "~50.0.0",
+    "expo-barcode-scanner": "~12.9.3",
     "expo-constants": "~15.4.0",
     "expo-file-system": "~16.0.0",
     "expo-haptics": "~12.8.0",
-    "expo-router": "~3.4.0",
+    "expo-head": "0.0.20",
+    "expo-keep-awake": "12.8.2",
     "expo-sqlite": "~13.4.0",
     "expo-status-bar": "~1.11.0",
     "react": "18.2.0",

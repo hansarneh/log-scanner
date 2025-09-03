@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, Alert, ScrollView, ActivityIndicator, Image, ImageBackground, Platform } from 'react-native';
+import { BarCodeScanner } from 'expo-barcode-scanner';
 
 // Lucide Icons (simulated with emoji for now - in real app use @expo/vector-icons)
 const Icons = {
@@ -221,6 +222,9 @@ export default function App() {
       setCurrentScreen('home');
       loadProductsCache(); // Oppdater produkter når man går tilbake til forsiden
     } else if (currentScreen === 'addProduct') {
+      setCurrentScreen('home');
+      loadProductsCache(); // Oppdater produkter når man går tilbake til forsiden
+    } else if (currentScreen === 'camera') {
       setCurrentScreen('home');
       loadProductsCache(); // Oppdater produkter når man går tilbake til forsiden
     } else {
@@ -486,20 +490,39 @@ export default function App() {
     );
   };
 
-  const handleCameraScan = () => {
-    // For Expo Snack, viser vi en melding om at kamera ikke er tilgjengelig
-    // I en ekte Expo-app ville vi brukt expo-barcode-scanner
-    Alert.alert(
-      'Kamera-skanning',
-      'Kamera-skanning er ikke tilgjengelig i Expo Snack.\n\nI en ekte Expo-app kan du:\n1. Installere expo-barcode-scanner\n2. Bruke kameraet til å skanne EAN-koder\n3. Få automatisk produkt-søk\n\nBruk "Søk EAN" for manuell inntasting.',
-      [
-        { text: 'OK' },
-        { 
-          text: 'Søk EAN i stedet', 
-          onPress: handleQuickScan 
-        }
-      ]
-    );
+  const handleCameraScan = async () => {
+    try {
+      const { status } = await BarCodeScanner.requestPermissionsAsync();
+      
+      if (status === 'granted') {
+        setCurrentScreen('camera');
+      } else {
+        Alert.alert(
+          'Tillatelse nødvendig', 
+          'Kamera-tillatelse er nødvendig for å skanne strekkoder.',
+          [
+            { text: 'Avbryt' },
+            { 
+              text: 'Søk EAN i stedet', 
+              onPress: handleQuickScan 
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error getting camera permissions:', error);
+      Alert.alert(
+        'Feil', 
+        'Kunne ikke få kamera-tillatelse. Bruk "Søk EAN" i stedet.',
+        [
+          { text: 'OK' },
+          { 
+            text: 'Søk EAN i stedet', 
+            onPress: handleQuickScan 
+          }
+        ]
+      );
+    }
   };
 
   const updateItemQty = (itemId, newQty) => {
@@ -626,7 +649,11 @@ export default function App() {
             <View style={styles.headerCart}>
               <TouchableOpacity 
                 style={styles.headerCartButton}
-                onPress={() => currentOrder && orderItems.length > 0 ? navigateTo('scan') : null}
+                onPress={() => {
+                if (currentOrder && orderItems.length > 0) {
+                  navigateTo('scan');
+                }
+              }}
               >
                 <Text style={styles.headerCartIcon}>{Icons.ShoppingCart}</Text>
                 {orderItems.length > 0 && (
@@ -1397,6 +1424,97 @@ export default function App() {
     </ScrollView>
   );
 
+  const renderCameraScreen = () => {
+    const [hasPermission, setHasPermission] = useState(null);
+    const [scanned, setScanned] = useState(false);
+
+    useEffect(() => {
+      const getBarCodeScannerPermissions = async () => {
+        try {
+          const { status } = await BarCodeScanner.requestPermissionsAsync();
+          setHasPermission(status === 'granted');
+        } catch (error) {
+          console.error('Error getting permissions:', error);
+          setHasPermission(false);
+        }
+      };
+
+      getBarCodeScannerPermissions();
+    }, []);
+
+    const handleBarCodeScanned = ({ type, data }) => {
+      setScanned(true);
+      handleScan(data);
+      setCurrentScreen('scan');
+    };
+
+    if (hasPermission === null) {
+      return (
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Kamera</Text>
+          </View>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#007AFF" />
+            <Text style={styles.loadingText}>Ber om kamera-tillatelse...</Text>
+          </View>
+        </View>
+      );
+    }
+
+    if (hasPermission === false) {
+      return (
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Kamera</Text>
+          </View>
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateTitle}>Ingen kamera-tillatelse</Text>
+            <Text style={styles.emptyStateMessage}>
+              Kamera-tillatelse er nødvendig for å skanne strekkoder.
+            </Text>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => setCurrentScreen('home')}
+            >
+              <Text style={styles.buttonText}>Tilbake til forsiden</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.container}>
+        <View style={styles.cameraHeader}>
+          <TouchableOpacity 
+            onPress={() => setCurrentScreen('home')} 
+            style={styles.backButton}
+          >
+            <Text style={styles.backButtonText}>← Tilbake</Text>
+          </TouchableOpacity>
+          <Text style={styles.cameraTitle}>Skann EAN-kode</Text>
+        </View>
+        
+        <View style={styles.cameraContainer}>
+          <BarCodeScanner
+            onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+            style={styles.camera}
+          />
+          
+          {scanned && (
+            <TouchableOpacity
+              style={styles.scanAgainButton}
+              onPress={() => setScanned(false)}
+            >
+              <Text style={styles.scanAgainButtonText}>Skann igjen</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    );
+  };
+
   const renderOrdersScreen = () => (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -1459,6 +1577,7 @@ export default function App() {
       {currentScreen === 'scan' && renderScanScreen()}
       {currentScreen === 'review' && renderReviewScreen()}
       {currentScreen === 'orders' && renderOrdersScreen()}
+      {currentScreen === 'camera' && renderCameraScreen()}
     </View>
   );
 }
@@ -2598,5 +2717,45 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Camera styles
+  cameraHeader: {
+    backgroundColor: '#edf4f0',
+    padding: 20,
+    paddingTop: 60,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  cameraTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0c5f30',
+    flex: 1,
+    textAlign: 'center',
+  },
+  cameraContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  camera: {
+    flex: 1,
+  },
+  scanAgainButton: {
+    position: 'absolute',
+    bottom: 40,
+    left: 20,
+    right: 20,
+    backgroundColor: '#34C759',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#0c5f30',
+  },
+  scanAgainButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '700',
   },
 });
