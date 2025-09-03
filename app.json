@@ -46,7 +46,8 @@
         {
           "cameraPermission": "Tillat appen til å bruke kameraet for å skanne strekkoder."
         }
-      ]
+      ],
+      "expo-dev-client"
     ],
     "scheme": "fairscanner",
     "extra": {
