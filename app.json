@@ -13,7 +13,10 @@
       "bundleIdentifier": "com.fairscanner.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "permissions": [
+        "NSCameraUsageDescription"
+      ]
     },
     "android": {
       "package": "com.fairscanner.app",
@@ -38,7 +41,12 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      [
+        "expo-barcode-scanner",
+        {
+          "cameraPermission": "Tillat appen til å bruke kameraet for å skanne strekkoder."
+        }
+      ]
     ],
     "scheme": "fairscanner",
     "extra": {
