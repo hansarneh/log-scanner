@@ -40,26 +40,31 @@ let supabase: any = null
 let supabaseServiceRole: any = null
 
 try {
-  supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: false
-    }
-  })
-  
-  supabaseServiceRole = createClient(
-    supabaseUrl, 
-    Constants.expoConfig?.extra?.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-    {
+  // Double-check we have valid keys before creating clients
+  if (supabaseUrl && supabaseAnonKey && supabaseAnonKey !== 'undefined' && supabaseAnonKey !== 'null') {
+    supabase = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
-        autoRefreshToken: false,
-        persistSession: false
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: false
       }
-    }
-  )
-  
-  console.log('Supabase clients created successfully')
+    })
+    
+    supabaseServiceRole = createClient(
+      supabaseUrl, 
+      Constants.expoConfig?.extra?.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
+    
+    console.log('Supabase clients created successfully')
+  } else {
+    throw new Error('Invalid Supabase configuration')
+  }
 } catch (error) {
   console.error('Error creating Supabase clients:', error)
   // Create fallback clients that won't crash
@@ -80,6 +85,8 @@ try {
       }
     }
   }
+  
+  console.log('Using fallback Supabase clients')
 }
 
 export { supabase, supabaseServiceRole }

@@ -3,6 +3,7 @@
     "name": "Fair Scanner",
     "slug": "fairscanner",
     "version": "1.0.0",
+    "scheme": "fairscanner",
     "assetBundlePatterns": [
       "**/*"
     ],
