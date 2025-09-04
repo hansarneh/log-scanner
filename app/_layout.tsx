@@ -2,7 +2,27 @@ import React from 'react'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import AuthWrapper from './components/AuthWrapper'
-import { View, Text, StyleSheet } from 'react-native'
+import { View, Text, StyleSheet, Alert } from 'react-native'
+
+// Global error handler
+if (__DEV__) {
+  const originalConsoleError = console.error
+  console.error = (...args) => {
+    originalConsoleError(...args)
+    // In development, show error alerts
+    if (args[0] && typeof args[0] === 'string' && args[0].includes('Error')) {
+      Alert.alert('Console Error', args[0])
+    }
+  }
+}
+
+// Global unhandled promise rejection handler
+if (typeof global !== 'undefined') {
+  global.addEventListener('unhandledrejection', (event) => {
+    console.error('Unhandled promise rejection:', event.reason)
+    Alert.alert('Unhandled Error', 'Promise rejection: ' + event.reason)
+  })
+}
 
 // Simple error boundary component
 class ErrorBoundary extends React.Component<
@@ -21,6 +41,7 @@ class ErrorBoundary extends React.Component<
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('App crashed with error:', error)
     console.error('Error info:', errorInfo)
+    Alert.alert('App Crashed', 'Error: ' + error.message)
   }
 
   render() {
