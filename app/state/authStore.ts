@@ -39,9 +39,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       console.log('AuthStore: Checking Supabase availability...')
       // Check if Supabase is properly initialized
-      if (!supabase.auth) {
+      if (!supabase || !supabase.auth) {
         console.warn('AuthStore: Supabase auth not available, skipping auth initialization')
-        set({ isLoading: false })
+        set({ isLoading: false, isAuthenticated: false })
+        return
+      }
+      
+      // Additional safety check for Supabase client
+      if (typeof supabase.auth.getSession !== 'function') {
+        console.warn('AuthStore: Supabase auth methods not available, using fallback')
+        set({ isLoading: false, isAuthenticated: false })
         return
       }
       
@@ -69,7 +76,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       
       console.log('AuthStore: Setting up auth state change listener...')
       // Listen for auth changes
-      supabase.auth.onAuthStateChange(async (event, session) => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         console.log('AuthStore: Auth state change:', event, !!session)
         if (event === 'SIGNED_IN' && session) {
           set({ session, isAuthenticated: true })
@@ -87,6 +94,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (error) {
       console.error('AuthStore: Error initializing auth:', error)
       // Don't crash the app, just log the error and continue
+      set({ isLoading: false, isAuthenticated: false })
     } finally {
       console.log('AuthStore: Setting loading to false')
       set({ isLoading: false })
