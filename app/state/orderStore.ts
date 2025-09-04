@@ -223,11 +223,11 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       }
 
       // Call edge function
-      const response = await fetch(`${APP_CONFIG.edgeFunctionUrl}/finalize-order`, {
+      const response = await fetch(`${APP_CONFIG.EDGE_FUNCTION_URL}/finalize-order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${APP_CONFIG.supabaseKey}`
+          'Authorization': `Bearer ${APP_CONFIG.SUPABASE_ANON_KEY}`
         },
         body: JSON.stringify(request)
       })
@@ -264,4 +264,4 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     const { orderItems } = get()
     return Array.from(orderItems.values()).reduce((total, item) => total + item.qty, 0)
   }
-})
+}));

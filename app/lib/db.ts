@@ -39,61 +39,85 @@ class Database {
   private db: SQLite.SQLiteDatabase
 
   constructor() {
-    this.db = SQLite.openDatabase('fairscanner.db')
-    this.init()
+    try {
+      console.log('Database: Opening database...')
+      this.db = SQLite.openDatabase('fairscanner.db')
+      console.log('Database: Database opened successfully')
+      this.init()
+    } catch (error) {
+      console.error('Database: Error opening database:', error)
+      // Don't crash, try to continue
+    }
   }
 
   private init() {
-    this.db.transaction(tx => {
-      // Create products table
-      tx.executeSql(`
-        CREATE TABLE IF NOT EXISTS products (
-          id TEXT PRIMARY KEY,
-          ean TEXT UNIQUE NOT NULL,
-          sku TEXT,
-          name TEXT NOT NULL,
-          price_kr REAL NOT NULL DEFAULT 0.00,
-          active INTEGER NOT NULL DEFAULT 1,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL
-        )
-      `)
+    try {
+      console.log('Database: Starting initialization...')
+      this.db.transaction(
+        tx => {
+          console.log('Database: Creating tables...')
+          // Create products table
+          tx.executeSql(`
+            CREATE TABLE IF NOT EXISTS products (
+              id TEXT PRIMARY KEY,
+              ean TEXT UNIQUE NOT NULL,
+              sku TEXT,
+              name TEXT NOT NULL,
+              price_kr REAL NOT NULL DEFAULT 0.00,
+              active INTEGER NOT NULL DEFAULT 1,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL
+            )
+          `)
 
-      // Create orders table
-      tx.executeSql(`
-        CREATE TABLE IF NOT EXISTS orders (
-          id TEXT PRIMARY KEY,
-          fair_name TEXT,
-          sales_rep TEXT,
-          customer_name TEXT NOT NULL,
-          customer_email TEXT,
-          note TEXT,
-          status TEXT NOT NULL DEFAULT 'draft',
-          created_at TEXT NOT NULL,
-          synced_at TEXT
-        )
-      `)
+          // Create orders table
+          tx.executeSql(`
+            CREATE TABLE IF NOT EXISTS orders (
+              id TEXT PRIMARY KEY,
+              fair_name TEXT,
+              sales_rep TEXT,
+              customer_name TEXT NOT NULL,
+              customer_email TEXT,
+              note TEXT,
+              status TEXT NOT NULL DEFAULT 'draft',
+              created_at TEXT NOT NULL,
+              synced_at TEXT
+            )
+          `)
 
-      // Create order_items table
-      tx.executeSql(`
-        CREATE TABLE IF NOT EXISTS order_items (
-          id TEXT PRIMARY KEY,
-          order_id TEXT NOT NULL,
-          product_id TEXT,
-          ean TEXT NOT NULL,
-          name TEXT NOT NULL,
-          qty INTEGER NOT NULL DEFAULT 1,
-          price_kr REAL NOT NULL,
-          created_at TEXT NOT NULL,
-          FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
-        )
-      `)
+          // Create order_items table
+          tx.executeSql(`
+            CREATE TABLE IF NOT EXISTS order_items (
+              id TEXT PRIMARY KEY,
+              order_id TEXT NOT NULL,
+              product_id TEXT,
+              ean TEXT NOT NULL,
+              name TEXT NOT NULL,
+              qty INTEGER NOT NULL DEFAULT 1,
+              price_kr REAL NOT NULL,
+              created_at TEXT NOT NULL,
+              FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+            )
+          `)
 
-      // Create indexes
-      tx.executeSql('CREATE INDEX IF NOT EXISTS products_ean_idx ON products(ean)')
-      tx.executeSql('CREATE INDEX IF NOT EXISTS order_items_order_idx ON order_items(order_id)')
-      tx.executeSql('CREATE INDEX IF NOT EXISTS orders_status_idx ON orders(status)')
-    })
+          // Create indexes
+          tx.executeSql('CREATE INDEX IF NOT EXISTS products_ean_idx ON products(ean)')
+          tx.executeSql('CREATE INDEX IF NOT EXISTS order_items_order_idx ON order_items(order_id)')
+          tx.executeSql('CREATE INDEX IF NOT EXISTS orders_status_idx ON orders(status)')
+          
+          console.log('Database: Tables created successfully')
+        },
+        error => {
+          console.error('Database: Transaction error during init:', error)
+        },
+        () => {
+          console.log('Database: Initialization completed successfully')
+        }
+      )
+    } catch (error) {
+      console.error('Database: Error during initialization:', error)
+      // Don't crash, try to continue
+    }
   }
 
   // Product methods

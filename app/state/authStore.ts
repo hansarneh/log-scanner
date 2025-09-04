@@ -33,37 +33,62 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isAuthenticated: false,
 
   initializeAuth: async () => {
+    console.log('AuthStore: Starting auth initialization...')
     set({ isLoading: true })
     
     try {
+      console.log('AuthStore: Checking Supabase availability...')
       // Check if Supabase is properly initialized
       if (!supabase.auth) {
-        console.warn('Supabase auth not available, skipping auth initialization')
+        console.warn('AuthStore: Supabase auth not available, skipping auth initialization')
         set({ isLoading: false })
         return
       }
       
+      console.log('AuthStore: Getting initial session...')
       // Get initial session
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
       
-      if (session) {
-        set({ session, isAuthenticated: true })
-        await get().loadUserProfile()
+      if (sessionError) {
+        console.error('AuthStore: Error getting session:', sessionError)
+        // Don't crash, continue without session
       }
       
+      if (session) {
+        console.log('AuthStore: Session found, setting authenticated state')
+        set({ session, isAuthenticated: true })
+        try {
+          await get().loadUserProfile()
+        } catch (profileError) {
+          console.error('AuthStore: Error loading user profile:', profileError)
+          // Don't crash, continue without profile
+        }
+      } else {
+        console.log('AuthStore: No session found, user not authenticated')
+      }
+      
+      console.log('AuthStore: Setting up auth state change listener...')
       // Listen for auth changes
       supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log('AuthStore: Auth state change:', event, !!session)
         if (event === 'SIGNED_IN' && session) {
           set({ session, isAuthenticated: true })
-          await get().loadUserProfile()
+          try {
+            await get().loadUserProfile()
+          } catch (profileError) {
+            console.error('AuthStore: Error loading user profile on sign in:', profileError)
+          }
         } else if (event === 'SIGNED_OUT') {
           set({ session: null, user: null, isAuthenticated: false })
         }
       })
+      
+      console.log('AuthStore: Auth initialization completed successfully')
     } catch (error) {
-      console.error('Error initializing auth:', error)
-      // Don't crash the app, just set loading to false
+      console.error('AuthStore: Error initializing auth:', error)
+      // Don't crash the app, just log the error and continue
     } finally {
+      console.log('AuthStore: Setting loading to false')
       set({ isLoading: false })
     }
   },
