@@ -36,6 +36,8 @@ export interface FinalizeOrderRequest {
   order: Order;
   items: OrderItem[];
   customer?: Customer;
+  user_email: string;
+  user_fair_name?: string;
 }
 
 export interface FinalizeOrderResponse {

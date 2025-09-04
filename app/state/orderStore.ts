@@ -1,8 +1,20 @@
 import { create } from 'zustand'
-import { LocalOrder, LocalOrderItem, database } from '../lib/db'
-import { productsCache, LocalProduct } from '../lib/productsCache'
-import { supabase } from '../lib/supabase'
+import { LocalOrder, LocalOrderItem, LocalProduct, database } from '../lib/db'
+import { productsCache } from '../lib/productsCache'
+import { APP_CONFIG } from '../lib/config'
 import { FinalizeOrderRequest, OrderItem } from '../../edge/shared/types'
+
+// Import auth store separately to avoid circular dependencies
+let authStore: any = null
+
+// Lazy load auth store
+const getAuthStore = () => {
+  if (!authStore) {
+    // Dynamic import to avoid circular dependency
+    authStore = require('./authStore').useAuthStore.getState()
+  }
+  return authStore
+}
 
 interface OrderState {
   // Current order
@@ -15,7 +27,7 @@ interface OrderState {
   lastScannedProduct: LocalProduct | null
   
   // Actions
-  startNewOrder: (orderData: Omit<LocalOrder, 'id' | 'created_at' | 'status'>) => Promise<string>
+  startNewOrder: (orderData: Omit<LocalOrder, 'id' | 'created_at' | 'status'>) => Promise<string | null>
   addScannedItem: (ean: string) => Promise<void>
   addManualItem: (ean: string, name: string, price_kr: number) => Promise<void>
   updateItemQty: (itemId: string, qty: number) => Promise<void>
@@ -36,22 +48,30 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   lastScannedProduct: null,
 
   startNewOrder: async (orderData) => {
-    const orderId = await database.createOrder({
-      ...orderData,
-      status: 'draft'
-    })
-    
-    const order = await database.getOrder(orderId)
-    if (!order) throw new Error('Failed to create order')
-    
-    set({
-      currentOrder: order,
-      orderItems: new Map(),
-      lastScannedEAN: null,
-      lastScannedProduct: null
-    })
-    
-    return orderId
+    try {
+      const orderId = await database.createOrder({
+        ...orderData,
+        status: 'draft'
+      })
+      
+      const order = await database.getOrder(orderId)
+      if (!order) {
+        console.error('Failed to create order')
+        return null
+      }
+      
+      set({
+        currentOrder: order,
+        orderItems: new Map(),
+        lastScannedEAN: null,
+        lastScannedProduct: null
+      })
+      
+      return orderId
+    } catch (error) {
+      console.error('Error starting new order:', error)
+      return null
+    }
   },
 
   addScannedItem: async (ean: string) => {
@@ -197,83 +217,51 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         customer: currentOrder.customer_email ? {
           name: currentOrder.customer_name,
           email: currentOrder.customer_email
-        } : undefined
+        } : undefined,
+        user_email: getAuthStore().user?.email || 'unknown@example.com',
+        user_fair_name: getAuthStore().user?.fair_name
       }
 
       // Call edge function
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/finalize-order`, {
+      const response = await fetch(`${APP_CONFIG.edgeFunctionUrl}/finalize-order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.supabaseKey}`
+          'Authorization': `Bearer ${APP_CONFIG.supabaseKey}`
         },
         body: JSON.stringify(request)
       })
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        throw new Error(`HTTP ${response.status}`)
       }
 
       const result = await response.json()
       
       if (result.success) {
-        // Update local order status
-        await database.updateOrder(currentOrder.id, { 
-          status: 'finalized',
-          synced_at: new Date().toISOString()
-        })
-        
-        // Clear current order
-        get().clearOrder()
-        
-        set({ isLoading: false })
+        // Mark order as finalized in local database
+        await database.updateOrder(currentOrder.id, { status: 'finalized' })
         return true
       } else {
-        throw new Error(result.error || 'Failed to finalize order')
+        console.error('Edge function failed:', result.error)
+        return false
       }
     } catch (error) {
       console.error('Error finalizing order:', error)
-      
-      // Mark order as sync error
-      if (currentOrder) {
-        await database.updateOrder(currentOrder.id, { status: 'sync_error' })
-      }
-      
-      set({ isLoading: false })
       return false
-    }
-  },
-
-  syncDraftOrders: async () => {
-    set({ isLoading: true })
-    
-    try {
-      const draftOrders = await database.getDraftOrders()
-      
-      for (const order of draftOrders) {
-        if (order.status === 'draft') {
-          // Try to finalize each draft order
-          const success = await get().finalizeOrder(order.note)
-          if (success) {
-            console.log(`Synced order ${order.id}`)
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error syncing draft orders:', error)
     } finally {
       set({ isLoading: false })
     }
   },
 
-
+  syncDraftOrders: async () => {
+    // This method would sync draft orders with the server
+    // For now, it's a placeholder
+    console.log('syncDraftOrders called')
+  },
 
   getItemCount: () => {
     const { orderItems } = get()
-    let count = 0
-    orderItems.forEach(item => {
-      count += item.qty
-    })
-    return count
+    return Array.from(orderItems.values()).reduce((total, item) => total + item.qty, 0)
   }
-}))
+})

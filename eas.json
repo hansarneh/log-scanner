@@ -7,7 +7,16 @@
       "developmentClient": true,
       "distribution": "internal",
       "ios": {
-        "resourceClass": "m-medium"
+        "simulator": false,
+        "buildConfiguration": "Debug"
+      }
+    },
+    "standalone": {
+      "developmentClient": false,
+      "distribution": "internal",
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release"
       }
     },
     "preview": {

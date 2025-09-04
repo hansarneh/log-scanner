@@ -1,7 +1,7 @@
 {
   "name": "fair-scanner",
   "version": "1.0.0",
-  "main": "App.js",
+  "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
@@ -12,15 +12,18 @@
     "seed": "tsx scripts/seed-products.ts"
   },
   "dependencies": {
+    "@react-navigation/native": "^6.1.18",
+    "@react-navigation/stack": "^6.4.1",
     "@supabase/supabase-js": "^2.39.0",
     "expo": "~50.0.0",
     "expo-barcode-scanner": "~12.9.3",
     "expo-constants": "~15.4.0",
-    "expo-dev-client": "^5.2.4",
     "expo-file-system": "~16.0.0",
     "expo-haptics": "~12.8.0",
     "expo-head": "0.0.20",
     "expo-keep-awake": "12.8.2",
+    "expo-linking": "~6.2.2",
+    "expo-router": "~3.4.10",
     "expo-sqlite": "~13.4.0",
     "expo-status-bar": "~1.11.0",
     "react": "18.2.0",
@@ -30,7 +33,7 @@
     "react-native-paper-dates": "^0.10.0",
     "react-native-reanimated": "~3.6.0",
     "react-native-safe-area-context": "4.8.2",
-    "react-native-screens": "3.29.0",
+    "react-native-screens": "~3.29.0",
     "react-native-toast-message": "^2.1.7",
     "react-native-vector-icons": "^10.0.3",
     "zustand": "^4.4.7"
@@ -39,7 +42,6 @@
     "@babel/core": "^7.20.0",
     "@types/node": "^20.10.0",
     "@types/react": "~18.2.45",
-    "@types/react-native": "~0.73.0",
     "tsx": "^4.7.0",
     "typescript": "^5.1.3"
   },

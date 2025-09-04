@@ -3,60 +3,22 @@
     "name": "Fair Scanner",
     "slug": "fairscanner",
     "version": "1.0.0",
-    "orientation": "portrait",
-    "userInterfaceStyle": "light",
     "assetBundlePatterns": [
       "**/*"
     ],
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.fairscanner.app",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      },
-      "permissions": [
-        "NSCameraUsageDescription"
-      ]
-    },
-    "android": {
-      "package": "com.fairscanner.app",
-      "permissions": [
-        "android.permission.VIBRATE",
-        "android.permission.INTERNET",
-        "android.permission.ACCESS_NETWORK_STATE"
-      ],
-      "intentFilters": [
-        {
-          "action": "com.fairscanner.BARCODE",
-          "category": [
-            "android.intent.category.DEFAULT"
-          ],
-          "data": {
-            "scheme": "fairscanner"
-          }
-        }
-      ]
-    },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": [
-      [
-        "expo-barcode-scanner",
-        {
-          "cameraPermission": "Tillat appen til å bruke kameraet for å skanne strekkoder."
-        }
-      ],
-      "expo-dev-client"
-    ],
-    "scheme": "fairscanner",
     "extra": {
       "router": {
         "origin": false
       },
       "eas": {
         "projectId": "d1ba345b-c30e-4e17-bcc6-f31458e4afe8"
-      }
+      },
+      "SUPABASE_URL": "https://eajuzgkhygkkzwkkrzef.supabase.co",
+      "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVhanV6Z2toeWdra3p3a2tyemVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY3MTQ0MTEsImV4cCI6MjA3MjI5MDQxMX0.KIm0m0ngMloLF7fukHVkOJ_r-ZZYEwM7v1ijR0vwJ_g",
+      "FAIR_NAME": "LOG MESSE"
     },
     "owner": "hansarne"
   }

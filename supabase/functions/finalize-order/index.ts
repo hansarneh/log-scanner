@@ -29,6 +29,8 @@ interface FinalizeOrderRequest {
   order: Order;
   items: OrderItem[];
   customer?: Customer;
+  user_email?: string;
+  user_fair_name?: string;
 }
 
 interface FinalizeOrderResponse {
@@ -62,20 +64,21 @@ serve(async (req) => {
       throw new Error('Missing Supabase configuration')
     }
 
-    if (!fallbackEmail) {
-      throw new Error('Missing fallback email configuration')
-    }
-
-    // Create Supabase client with service role
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
     // Parse request body
     const body: FinalizeOrderRequest = await req.json()
-    const { order, items, customer } = body
+    const { order, items, customer, user_email, user_fair_name } = body
 
     if (!order || !items || items.length === 0) {
       throw new Error('Invalid request: missing order or items')
     }
+
+    // Use user's fair name if provided, otherwise fallback to environment
+    const finalFairName = user_fair_name || fairName
+    // Use user's email as fallback if no customer email
+    const finalFallbackEmail = user_email
+
+    // Create Supabase client with service role
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // 1. Upsert customer if provided
     let customerId: string | null = null
@@ -118,7 +121,7 @@ serve(async (req) => {
       .from('orders')
       .upsert({
         id: order.id,
-        fair_name: order.fair_name || fairName,
+        fair_name: order.fair_name || finalFairName,
         sales_rep: order.sales_rep,
         customer_id: customerId,
         customer_name: order.customer_name,
@@ -176,9 +179,9 @@ serve(async (req) => {
 
     // 7. Send email (placeholder - logs to console in Deno)
     const emailData = {
-      to: order.customer_email || fallbackEmail,
+      to: order.customer_email || finalFallbackEmail,
       cc: ccEmail,
-      subject: `Order ${order.id} - ${fairName}`,
+      subject: `Order ${order.id} - ${finalFairName}`,
       body: `Your order has been finalized.\n\nOrder ID: ${order.id}\nCustomer: ${order.customer_name}\nItems: ${items.length}\n\nDownload CSV: ${signedUrlData?.signedUrl || 'N/A'}`,
       attachment: btoa(csvContent)
     }

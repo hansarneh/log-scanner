@@ -163,6 +163,38 @@ class Database {
     })
   }
 
+  async searchProducts(query: string): Promise<LocalProduct[]> {
+    const searchTerm = `%${query.toLowerCase()}%`
+    
+    return new Promise((resolve, reject) => {
+      this.db.transaction(tx => {
+        tx.executeSql(
+          `SELECT * FROM products 
+           WHERE active = 1 
+           AND (LOWER(name) LIKE ? OR LOWER(ean) LIKE ? OR LOWER(sku) LIKE ?)
+           ORDER BY name
+           LIMIT 50`,
+          [searchTerm, searchTerm, searchTerm],
+          (_, result) => {
+            const products: LocalProduct[] = []
+            for (let i = 0; i < result.rows.length; i++) {
+              const row = result.rows.item(i)
+              products.push({
+                ...row,
+                active: Boolean(row.active)
+              })
+            }
+            resolve(products)
+          },
+          (_, error) => {
+            reject(error)
+            return false
+          }
+        )
+      })
+    })
+  }
+
   // Order methods
   async createOrder(order: Omit<LocalOrder, 'id' | 'created_at'>): Promise<string> {
     const id = crypto.randomUUID()

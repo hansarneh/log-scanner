@@ -12,11 +12,23 @@ import Constants from 'expo-constants'
 
 export default function IndexScreen() {
   const router = useRouter()
-  const fairName = Constants.expoConfig?.extra?.FAIR_NAME || 'Myplant 2025'
+  const fairName = (() => {
+    try {
+      return Constants.expoConfig?.extra?.FAIR_NAME || 'Myplant 2025'
+    } catch (error) {
+      console.warn('Failed to get fair name from constants:', error)
+      return 'Myplant 2025'
+    }
+  })()
 
   useEffect(() => {
-    // Preload products on app start
-    productsCache.syncProducts()
+    // Preload products on app start - with error handling
+    try {
+      productsCache.syncProducts()
+    } catch (error) {
+      console.warn('Failed to sync products on startup:', error)
+      // Don't crash the app, just log the warning
+    }
   }, [])
 
   return (
@@ -46,6 +58,13 @@ export default function IndexScreen() {
             onPress={() => router.push('/orders')}
           >
             <Text style={styles.secondaryButtonText}>Se ordrer</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.tertiaryButton}
+            onPress={() => router.push('/add-product')}
+          >
+            <Text style={styles.tertiaryButtonText}>Legg til produkt</Text>
           </TouchableOpacity>
         </View>
 
@@ -118,6 +137,19 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: '#007AFF',
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  tertiaryButton: {
+    backgroundColor: '#E0E0E0',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#B0B0B0',
+  },
+  tertiaryButtonText: {
+    color: '#333',
     fontSize: 20,
     fontWeight: '600',
   },
