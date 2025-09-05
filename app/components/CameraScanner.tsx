@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native'
-import { CameraView, CameraType, useCameraPermissions } from 'expo-camera'
+import { Camera, CameraView, useCameraPermissions } from 'expo-camera'
 import * as Haptics from 'expo-haptics'
 import Constants from 'expo-constants'
 
@@ -93,7 +93,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
     }
   }, [visible])
 
-  const handleBarcodeScanned = ({ type, data }: { type: string; data: string }) => {
+  const handleBarcodeScanned = ({ data }: { data: string }) => {
     if (!data) return
     
     // Debounce: avoid spam by checking last scanned value
@@ -109,7 +109,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
       // Call the onScan callback
       onScan(data)
       
-      console.log('EAN funnet:', type, data)
+      console.log('EAN funnet:', data)
     } else {
       // Invalid barcode
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
@@ -175,9 +175,9 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
     <View style={styles.container}>
       <CameraView
         ref={cameraRef}
-        onBarcodeScanned={handleBarcodeScanned}
+        onModernBarcodeScanned={handleBarcodeScanned}
         barcodeScannerSettings={{
-          barcodeTypes: ['ean13', 'ean8'],
+          barcodeTypes: ['ean13', 'ean8'] as const,
         }}
         style={StyleSheet.absoluteFillObject}
         facing="back"
