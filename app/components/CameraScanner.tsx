@@ -93,7 +93,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
     }
   }, [visible])
 
-  const handleBarcodeScanned = ({ data }: { data: string }) => {
+  const handleBarcodeScanned = ({ type, data }: { type: string; data: string }) => {
     if (!data) return
     
     // Debounce: avoid spam by checking last scanned value
@@ -109,7 +109,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
       // Call the onScan callback
       onScan(data)
       
-      console.log('EAN funnet:', data)
+      console.log('EAN funnet:', type, data)
     } else {
       // Invalid barcode
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
@@ -175,9 +175,9 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
     <View style={styles.container}>
       <CameraView
         ref={cameraRef}
-        onModernBarcodeScanned={handleBarcodeScanned}
+        onBarcodeScanned={handleBarcodeScanned}
         barcodeScannerSettings={{
-          barcodeTypes: ['ean13', 'ean8'] as const,
+          barcodeTypes: ['ean13', 'ean8'],
         }}
         style={StyleSheet.absoluteFillObject}
         facing="back"
