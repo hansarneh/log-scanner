@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native'
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera'
 import * as Haptics from 'expo-haptics'
+import Constants from 'expo-constants'
 
 interface CameraScannerProps {
   onScan: (ean: string) => void
@@ -20,6 +21,40 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
   const [hasError, setHasError] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const cameraRef = useRef<CameraView>(null)
+
+  // Check if running in simulator
+  const isSimulator = Constants.platform?.ios?.simulator || Constants.platform?.android?.emulator
+
+  // Show simulator message instead of camera
+  if (isSimulator) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.simulatorContainer}>
+          <Text style={styles.simulatorTitle}>Kamera ikke tilgjengelig</Text>
+          <Text style={styles.simulatorText}>
+            Kamera-funksjonen kan ikke testes i simulatoren.{'\n'}
+            Test på en fysisk enhet for å bruke skanning.
+          </Text>
+          {__DEV__ && (
+            <TouchableOpacity 
+              style={styles.testButton}
+              onPress={() => handleBarcodeScanned({ type: 'ean13', data: '1234567890123' })}
+            >
+              <Text style={styles.testButtonText}>Test Scan (Simulator)</Text>
+            </TouchableOpacity>
+          )}
+          {onClose && (
+            <TouchableOpacity 
+              style={[styles.button, { marginTop: 20 }]}
+              onPress={onClose}
+            >
+              <Text style={styles.buttonText}>Lukk</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    )
+  }
 
   // Error boundary for camera component
   if (hasError) {
@@ -58,9 +93,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
     }
   }, [visible])
 
-  const handleModernBarcodeScanned = (result: { data: string; type: string }) => {
-    const { data, type } = result
-    
+  const handleBarcodeScanned = ({ type, data }: { type: string; data: string }) => {
     if (!data) return
     
     // Debounce: avoid spam by checking last scanned value
@@ -142,9 +175,9 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
     <View style={styles.container}>
       <CameraView
         ref={cameraRef}
-        onModernBarcodeScanned={handleModernBarcodeScanned}
+        onBarcodeScanned={handleBarcodeScanned}
         barcodeScannerSettings={{
-          barcodeTypes: ['ean13', 'ean8'] as const,
+          barcodeTypes: ['ean13', 'ean8'],
         }}
         style={StyleSheet.absoluteFillObject}
         facing="back"
@@ -178,7 +211,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
         {__DEV__ && (
           <TouchableOpacity 
             style={styles.testButton}
-            onPress={() => handleModernBarcodeScanned({ type: 'ean13', data: '1234567890123' })}
+            onPress={() => handleBarcodeScanned({ type: 'ean13', data: '1234567890123' })}
           >
             <Text style={styles.testButtonText}>Test Scan</Text>
           </TouchableOpacity>
@@ -367,6 +400,27 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     textAlign: 'center',
+    marginBottom: 20,
+  },
+  simulatorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    padding: 20,
+  },
+  simulatorTitle: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  simulatorText: {
+    color: 'white',
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 24,
     marginBottom: 20,
   },
 })
