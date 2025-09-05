@@ -16,13 +16,7 @@ if (__DEV__) {
   }
 }
 
-// Global unhandled promise rejection handler
-if (typeof global !== 'undefined') {
-  global.addEventListener('unhandledrejection', (event) => {
-    console.error('Unhandled promise rejection:', event.reason)
-    Alert.alert('Unhandled Error', 'Promise rejection: ' + event.reason)
-  })
-}
+// Global unhandled promise rejection handler - removed for React Native compatibility
 
 // Simple error boundary component
 class ErrorBoundary extends React.Component<
@@ -41,7 +35,7 @@ class ErrorBoundary extends React.Component<
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('App crashed with error:', error)
     console.error('Error info:', errorInfo)
-    Alert.alert('App Crashed', 'Error: ' + error.message)
+    Alert.alert('App Crashed', 'Error: ' + (error?.message || 'Unknown error'))
   }
 
   render() {

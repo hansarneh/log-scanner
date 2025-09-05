@@ -5,8 +5,6 @@ export interface UserProfile {
   id: string
   email: string
   full_name?: string
-  fair_name?: string
-  sales_rep_name?: string
   created_at: string
   updated_at: string
 }
@@ -16,6 +14,7 @@ interface AuthState {
   session: any | null
   isLoading: boolean
   isAuthenticated: boolean
+  tempUserData: any | null
   
   // Actions
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
@@ -31,6 +30,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   session: null,
   isLoading: true,
   isAuthenticated: false,
+  tempUserData: null,
 
   initializeAuth: async () => {
     console.log('AuthStore: Starting auth initialization...')
@@ -80,13 +80,37 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         console.log('AuthStore: Auth state change:', event, !!session)
         if (event === 'SIGNED_IN' && session) {
           set({ session, isAuthenticated: true })
+          
+          // Check if we have temporary user data to create profile
+          const { tempUserData } = get()
+          if (tempUserData) {
+            console.log('Creating user profile from temp data:', tempUserData)
+            
+            try {
+              // Create the user profile now that user is authenticated
+              const { error: profileError } = await supabase
+                .from('user_profiles')
+                .insert(tempUserData)
+              
+              if (profileError) {
+                console.error('Error creating user profile:', profileError)
+              } else {
+                console.log('User profile created successfully')
+                // Clear temp data
+                set((state) => ({ ...state, tempUserData: null }))
+              }
+            } catch (profileError) {
+              console.error('Error creating user profile:', profileError)
+            }
+          }
+          
           try {
             await get().loadUserProfile()
           } catch (profileError) {
             console.error('AuthStore: Error loading user profile on sign in:', profileError)
           }
         } else if (event === 'SIGNED_OUT') {
-          set({ session: null, user: null, isAuthenticated: false })
+          set({ session: null, user: null, isAuthenticated: false, tempUserData: null })
         }
       })
       
@@ -117,7 +141,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   signUp: async (email: string, password: string, fullName: string) => {
+    console.log('AuthStore: Starting signup for:', email, fullName)
     try {
+      // Store the user data temporarily for profile creation after auth
+      const tempUserData = { fullName, email }
+      
+      console.log('AuthStore: Calling Supabase auth.signUp...')
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -128,25 +157,36 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
       })
       
-      if (error) throw error
+      console.log('AuthStore: Supabase signup response:', { data: !!data, error: !!error, userId: data?.user?.id })
       
-      // Create user profile
-      if (data.user) {
-        const { error: profileError } = await supabase
-          .from('user_profiles')
-          .insert({
-            id: data.user.id,
-            email: data.user.email!,
-            full_name: fullName,
-            fair_name: 'Myplant 2025', // Default fair name
-            sales_rep_name: fullName
-          })
-        
-        if (profileError) throw profileError
+      if (error) {
+        console.error('AuthStore: Supabase signup error:', error)
+        throw error
       }
       
+      // Store the user data in memory for later profile creation
+      if (data.user) {
+        console.log('AuthStore: User created, storing temp data...')
+        // We'll create the profile after the user signs in
+        // Store the data temporarily in the store
+        set((state) => ({
+          ...state,
+          tempUserData: {
+            id: data.user.id,
+            email: data.user.email!,
+            full_name: fullName
+          }
+        }))
+        console.log('AuthStore: Temp data stored successfully')
+        
+        // Note: User will need to confirm email before they can sign in
+        console.log('AuthStore: User created successfully. Email confirmation required before signin.')
+      }
+      
+      console.log('AuthStore: Signup completed successfully')
       return { success: true }
     } catch (error: any) {
+      console.error('AuthStore: Signup failed:', error)
       return { success: false, error: error.message }
     }
   },
@@ -169,13 +209,42 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         .from('user_profiles')
         .select('*')
         .eq('id', session.user.id)
-        .single()
+        .maybeSingle() // Use maybeSingle() instead of single() to handle no results gracefully
       
-      if (error) throw error
+      if (error) {
+        console.error('Error loading user profile:', error)
+        return
+      }
       
-      set({ user: data })
+      if (data) {
+        set({ user: data })
+        console.log('User profile loaded successfully:', data.email)
+      } else {
+        // No profile found, create a basic one
+        console.log('No user profile found, creating basic profile...')
+        const basicProfile = {
+          id: session.user.id,
+          email: session.user.email || '',
+          full_name: session.user.user_metadata?.full_name || '',
+          updated_at: new Date().toISOString()
+        }
+        
+        const { error: insertError } = await supabase
+          .from('user_profiles')
+          .insert(basicProfile)
+        
+        if (insertError) {
+          console.error('Error creating user profile:', insertError)
+          // Set basic profile anyway for app functionality
+          set({ user: basicProfile })
+        } else {
+          console.log('User profile created successfully')
+          set({ user: basicProfile })
+        }
+      }
     } catch (error) {
       console.error('Error loading user profile:', error)
+      // Don't crash, just log the error
     }
   },
 

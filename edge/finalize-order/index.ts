@@ -79,32 +79,48 @@ serve(async (req) => {
 
     // 1. Upsert customer if provided
     let customerId: string | null = null
-    if (customer && customer.email) {
-      const { data: existingCustomer } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('email', customer.email)
-        .single()
+    if (customer && customer.name) {
+      // First try to find by email if available
+      let existingCustomer = null
+      if (customer.email) {
+        const { data } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('email', customer.email)
+          .single()
+        existingCustomer = data
+      }
+      
+      // If not found by email, try to find by name
+      if (!existingCustomer) {
+        const { data } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('name', customer.name)
+          .single()
+        existingCustomer = data
+      }
 
       if (existingCustomer) {
         customerId = existingCustomer.id
         // Update customer info
+        const updateData: any = { name: customer.name }
+        if (customer.email) updateData.email = customer.email
+        if (customer.phone) updateData.phone = customer.phone
+        
         await supabase
           .from('customers')
-          .update({
-            name: customer.name,
-            phone: customer.phone
-          })
+          .update(updateData)
           .eq('id', customerId)
       } else {
         // Insert new customer
+        const insertData: any = { name: customer.name }
+        if (customer.email) insertData.email = customer.email
+        if (customer.phone) insertData.phone = customer.phone
+        
         const { data: newCustomer, error: customerError } = await supabase
           .from('customers')
-          .insert({
-            name: customer.name,
-            email: customer.email,
-            phone: customer.phone
-          })
+          .insert(insertData)
           .select('id')
           .single()
 
@@ -114,6 +130,10 @@ serve(async (req) => {
     }
 
     // 2. Upsert order
+    // Use customer name from customer object if available, otherwise use order.customer_name
+    const finalCustomerName = customer?.name || order.customer_name
+    const finalCustomerEmail = customer?.email || order.customer_email
+    
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
       .upsert({
@@ -121,8 +141,8 @@ serve(async (req) => {
         fair_name: order.fair_name || fairName,
         sales_rep: order.sales_rep,
         customer_id: customerId,
-        customer_name: order.customer_name,
-        customer_email: order.customer_email,
+        customer_name: finalCustomerName,
+        customer_email: finalCustomerEmail,
         note: order.note,
         status: 'finalized',
         synced_at: new Date().toISOString()

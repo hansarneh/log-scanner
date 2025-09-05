@@ -8,9 +8,17 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator
+  ActivityIndicator,
+  SafeAreaView,
+  Image,
+  Dimensions,
 } from 'react-native'
 import { useAuthStore } from '../state/authStore'
+import Constants from 'expo-constants'
+import { Colors, Typography, Spacing, BorderRadius, Shadows, Images, ButtonStyles } from '../lib/design'
+// import { LinearGradient } from 'expo-linear-gradient'
+
+const { width } = Dimensions.get('window')
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('')
@@ -21,7 +29,19 @@ export default function LoginScreen() {
   
   const { signIn, signUp } = useAuthStore()
 
+  const fairName = (() => {
+    try {
+      return Constants.expoConfig?.extra?.FAIR_NAME || 'LOG MESSE'
+    } catch (error) {
+      console.warn('Failed to get fair name from constants:', error)
+      return 'LOG MESSE'
+    }
+  })()
+
   const handleAuth = async () => {
+    console.log('LoginScreen: handleAuth called, isSignUp:', isSignUp)
+    console.log('LoginScreen: Form data:', { email, password, fullName })
+    
     if (!email || !password) {
       Alert.alert('Error', 'Please fill in all fields')
       return
@@ -32,20 +52,36 @@ export default function LoginScreen() {
       return
     }
 
+    console.log('LoginScreen: Starting authentication...')
     setIsLoading(true)
 
     try {
       let result
       if (isSignUp) {
+        console.log('LoginScreen: Calling signUp...')
         result = await signUp(email, password, fullName)
+        console.log('LoginScreen: signUp result:', result)
       } else {
+        console.log('LoginScreen: Calling signIn...')
         result = await signIn(email, password)
+        console.log('LoginScreen: signIn result:', result)
       }
 
       if (!result.success) {
+        console.log('LoginScreen: Authentication failed:', result.error)
         Alert.alert('Error', result.error || 'Authentication failed')
+      } else {
+        console.log('LoginScreen: Authentication successful!')
+        if (isSignUp) {
+          Alert.alert(
+            'Account Created!', 
+            'Please check your email and click the confirmation link before signing in.',
+            [{ text: 'OK', onPress: () => setIsSignUp(false) }]
+          )
+        }
       }
     } catch (error) {
+      console.error('LoginScreen: Unexpected error:', error)
       Alert.alert('Error', 'An unexpected error occurred')
     } finally {
       setIsLoading(false)
@@ -53,133 +89,182 @@ export default function LoginScreen() {
   }
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <View style={styles.content}>
-        <Text style={styles.title}>
-          {isSignUp ? 'Create Account' : 'Welcome Back'}
-        </Text>
-        <Text style={styles.subtitle}>
-          {isSignUp ? 'Sign up to start scanning' : 'Sign in to continue'}
-        </Text>
-
-        {isSignUp && (
-          <TextInput
-            style={styles.input}
-            placeholder="Full Name"
-            value={fullName}
-            onChangeText={setFullName}
-            autoCapitalize="words"
-            autoCorrect={false}
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView 
+        style={styles.keyboardView} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        {/* Header with Logo Only */}
+        <View style={styles.header}>
+          <Image 
+            source={{ uri: Images.logo }} 
+            style={styles.logo}
+            resizeMode="contain"
           />
-        )}
+        </View>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          autoCapitalize="none"
-        />
-
-        <TouchableOpacity
-          style={[styles.button, isLoading && styles.buttonDisabled]}
-          onPress={handleAuth}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>
-              {isSignUp ? 'Sign Up' : 'Sign In'}
+        {/* Form Section */}
+        <View style={styles.formContainer}>
+          <View style={styles.formHeader}>
+            <Text style={styles.formTitle}>
+              {isSignUp ? 'Create Account' : 'Sign In'}
             </Text>
-          )}
-        </TouchableOpacity>
+          </View>
 
-        <TouchableOpacity
-          style={styles.switchButton}
-          onPress={() => setIsSignUp(!isSignUp)}
-        >
-          <Text style={styles.switchText}>
-            {isSignUp 
-              ? 'Already have an account? Sign In' 
-              : "Don't have an account? Sign Up"
-            }
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+          <View style={styles.form}>
+            {isSignUp && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Full Name</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your full name"
+                  value={fullName}
+                  onChangeText={setFullName}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                />
+              </View>
+            )}
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Email</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your email"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Password</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
+              onPress={handleAuth}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color={Colors.white} />
+              ) : (
+                <Text style={styles.primaryButtonText}>
+                  {isSignUp ? 'Create Account' : 'Sign In'}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() => setIsSignUp(!isSignUp)}
+            >
+              <Text style={styles.secondaryButtonText}>
+                {isSignUp ? 'Already have an account? Sign In' : 'Need an account? Sign Up'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: Colors.background,
   },
-  content: {
+  keyboardView: {
     flex: 1,
+  },
+  header: {
+    alignItems: 'center',
+    paddingTop: Spacing.xxl,
+    paddingBottom: Spacing.xl,
+    paddingHorizontal: Spacing.xl,
+    width: '100%',
+  },
+  logo: {
+    width: 120,
+    height: 80,
+    marginBottom: Spacing.lg,
+    alignSelf: 'center',
+  },
+  formContainer: {
+    flex: 1,
+    padding: Spacing.lg,
     justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 50,
   },
-  title: {
-    fontSize: 28,
+  formHeader: {
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
+  },
+  formTitle: {
+    ...Typography.h2,
+    color: Colors.text,
+    marginBottom: Spacing.sm,
+    textAlign: 'center',
     fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 8,
-    color: '#333',
   },
-  subtitle: {
-    fontSize: 16,
+  formSubtitle: {
+    ...Typography.body,
+    color: Colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 32,
-    color: '#666',
+    maxWidth: width * 0.8,
+  },
+  form: {
+    width: '100%',
+  },
+  inputContainer: {
+    marginBottom: Spacing.md,
+  },
+  inputLabel: {
+    ...Typography.bodySmall,
+    color: Colors.text,
+    marginBottom: Spacing.xs,
+    fontWeight: '500',
   },
   input: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 16,
-    fontSize: 16,
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: Colors.border,
+    fontSize: 16,
+    color: Colors.text,
+    ...Shadows.small,
   },
-  button: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 8,
+  primaryButton: {
+    ...ButtonStyles.primary,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.md,
   },
   buttonDisabled: {
-    backgroundColor: '#ccc',
+    opacity: 0.6,
   },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
+  primaryButtonText: {
+    ...Typography.button,
+    color: Colors.white,
     fontWeight: '600',
   },
-  switchButton: {
-    marginTop: 24,
-    alignItems: 'center',
+  secondaryButton: {
+    ...ButtonStyles.text,
   },
-  switchText: {
-    color: '#007AFF',
-    fontSize: 16,
+  secondaryButtonText: {
+    ...Typography.body,
+    color: Colors.primary,
+    textAlign: 'center',
+    fontWeight: '500',
   },
 })

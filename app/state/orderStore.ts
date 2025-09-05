@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { LocalOrder, LocalOrderItem, LocalProduct, database } from '../lib/db'
+import { LocalOrder, LocalOrderItem, LocalProduct, LocalCustomer, database } from '../lib/db'
 import { productsCache } from '../lib/productsCache'
 import { APP_CONFIG } from '../lib/config'
 import { FinalizeOrderRequest, OrderItem } from '../../edge/shared/types'
@@ -29,11 +29,15 @@ interface OrderState {
   // Actions
   startNewOrder: (orderData: Omit<LocalOrder, 'id' | 'created_at' | 'status'>) => Promise<string | null>
   addScannedItem: (ean: string) => Promise<void>
-  addManualItem: (ean: string, name: string, price_kr: number) => Promise<void>
+  addManualItem: (ean: string, name: string, price_kr: number, discount_percent?: number, discount_reason?: string, sku?: string) => Promise<void>
   updateItemQty: (itemId: string, qty: number) => Promise<void>
+  updateItemDiscount: (itemId: string, discount_percent: number, discount_reason?: string) => Promise<void>
   removeItem: (itemId: string) => Promise<void>
+  updateOrderDetails: (customer_name: string, delivery_date?: string) => Promise<void>
   clearOrder: () => void
   finalizeOrder: (note?: string) => Promise<boolean>
+  saveDraftOrder: (customer_name: string) => Promise<boolean>
+  loadDraftOrder: (orderId: string) => Promise<boolean>
   syncDraftOrders: () => Promise<void>
   
   // Getters
@@ -49,16 +53,22 @@ export const useOrderStore = create<OrderState>((set, get) => ({
 
   startNewOrder: async (orderData) => {
     try {
+      console.log('Starting new order with data:', orderData)
+      
       const orderId = await database.createOrder({
         ...orderData,
         status: 'draft'
       })
       
+      console.log('Order created with ID:', orderId)
+      
       const order = await database.getOrder(orderId)
       if (!order) {
-        console.error('Failed to create order')
-        return null
+        console.error('Failed to retrieve created order')
+        throw new Error('Failed to retrieve created order')
       }
+      
+      console.log('Retrieved order:', order)
       
       set({
         currentOrder: order,
@@ -67,10 +77,11 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         lastScannedProduct: null
       })
       
+      console.log('Order state updated successfully')
       return orderId
     } catch (error) {
       console.error('Error starting new order:', error)
-      return null
+      throw error // Re-throw to let caller handle it
     }
   },
 
@@ -90,9 +101,12 @@ export const useOrderStore = create<OrderState>((set, get) => ({
           order_id: currentOrder.id,
           product_id: product.id,
           ean: product.ean,
+          sku: product.sku,
           name: product.name,
           qty: 1,
-          price_kr: product.price_kr
+          price_kr: product.price_kr,
+          discount_percent: 0,
+          discount_reason: undefined
         })
         
         // Refresh order items
@@ -112,6 +126,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
           lastScannedProduct: null,
           isLoading: false
         })
+        console.log('Product not found for EAN:', ean)
       }
     } catch (error) {
       console.error('Error adding scanned item:', error)
@@ -119,18 +134,29 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     }
   },
 
-  addManualItem: async (ean: string, name: string, price_kr: number) => {
+  addManualItem: async (ean: string, name: string, price_kr: number, discount_percent?: number, discount_reason?: string, sku?: string) => {
     const { currentOrder } = get()
-    if (!currentOrder) return
+    if (!currentOrder) {
+      console.error('No current order found when trying to add manual item')
+      throw new Error('No active order found')
+    }
 
     try {
+      console.log('Adding manual item to order:', currentOrder.id, { ean, name, price_kr, sku })
+      
       const itemId = await database.upsertOrderItem({
         order_id: currentOrder.id,
+        product_id: undefined, // No product_id for manual items
         ean,
+        sku: sku || undefined, // Use provided SKU or undefined
         name,
         qty: 1,
-        price_kr
+        price_kr,
+        discount_percent: discount_percent || 0,
+        discount_reason
       })
+      
+      console.log('Manual item added with ID:', itemId)
       
       // Refresh order items
       const items = await database.getOrderItems(currentOrder.id)
@@ -141,8 +167,11 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         lastScannedEAN: ean,
         lastScannedProduct: null
       })
+      
+      console.log('Order items refreshed, total items:', items.length)
     } catch (error) {
       console.error('Error adding manual item:', error)
+      throw error // Re-throw to let caller handle it
     }
   },
 
@@ -163,6 +192,18 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     }
   },
 
+  updateItemDiscount: async (itemId: string, discount_percent: number, discount_reason?: string) => {
+    await database.updateOrderItemDiscount(itemId, discount_percent, discount_reason)
+    
+    // Refresh order items
+    const { currentOrder } = get()
+    if (currentOrder) {
+      const items = await database.getOrderItems(currentOrder.id)
+      const itemsMap = new Map(items.map(item => [item.id, item]))
+      set({ orderItems: itemsMap })
+    }
+  },
+
   removeItem: async (itemId: string) => {
     await database.deleteOrderItem(itemId)
     
@@ -172,6 +213,46 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       const items = await database.getOrderItems(currentOrder.id)
       const itemsMap = new Map(items.map(item => [item.id, item]))
       set({ orderItems: itemsMap })
+    }
+  },
+
+  updateOrderDetails: async (customer_name: string, delivery_date?: string) => {
+    const { currentOrder } = get()
+    if (!currentOrder) return
+
+    try {
+      // Create or find customer
+      let customerId: string | undefined
+      const existingCustomer = await database.getCustomerByName(customer_name)
+      if (!existingCustomer) {
+        const customer: LocalCustomer = {
+          id: database.generateUUID(),
+          name: customer_name,
+          email: currentOrder.customer_email || undefined,
+          phone: undefined,
+          address: undefined,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+        await database.upsertCustomer(customer)
+        customerId = customer.id
+      } else {
+        customerId = existingCustomer.id
+      }
+
+      await database.updateOrder(currentOrder.id, {
+        customer_name,
+        delivery_date,
+        customer_id: customerId
+      })
+      
+      // Refresh current order
+      const updatedOrder = await database.getOrder(currentOrder.id)
+      if (updatedOrder) {
+        set({ currentOrder: updatedOrder })
+      }
+    } catch (error) {
+      console.error('Error updating order details:', error)
     }
   },
 
@@ -214,12 +295,13 @@ export const useOrderStore = create<OrderState>((set, get) => ({
           note: note || currentOrder.note
         },
         items,
-        customer: currentOrder.customer_email ? {
+        // Always send customer data if customer_name exists, regardless of email
+        customer: currentOrder.customer_name ? {
           name: currentOrder.customer_name,
-          email: currentOrder.customer_email
+          email: currentOrder.customer_email || undefined,
+          phone: undefined // TODO: Add phone field to order if needed
         } : undefined,
-        user_email: getAuthStore().user?.email || 'unknown@example.com',
-        user_fair_name: getAuthStore().user?.fair_name
+        user_email: getAuthStore().user?.email || 'unknown@example.com'
       }
 
       // Call edge function
@@ -239,8 +321,43 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       const result = await response.json()
       
       if (result.success) {
-        // Mark order as finalized in local database
-        await database.updateOrder(currentOrder.id, { status: 'finalized' })
+        // Create or update customer in local database
+        let customerId: string
+        console.log('OrderStore: Checking for existing customer:', currentOrder.customer_name)
+        const existingCustomer = await database.getCustomerByName(currentOrder.customer_name)
+        if (!existingCustomer) {
+          console.log('OrderStore: Creating new customer:', currentOrder.customer_name)
+          const customer: LocalCustomer = {
+            id: database.generateUUID(),
+            name: currentOrder.customer_name,
+            email: currentOrder.customer_email || undefined,
+            phone: undefined,
+            address: undefined,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+          await database.upsertCustomer(customer)
+          customerId = customer.id
+          console.log('OrderStore: Customer created with ID:', customerId)
+        } else {
+          customerId = existingCustomer.id
+          console.log('OrderStore: Using existing customer ID:', customerId)
+        }
+
+        // Update order with customer_id and mark as finalized
+        await database.updateOrder(currentOrder.id, { 
+          status: 'finalized',
+          customer_id: customerId
+        })
+        
+        // Clear current order and items (empty cart)
+        set({
+          currentOrder: null,
+          orderItems: new Map(),
+          lastScannedEAN: null,
+          lastScannedProduct: null
+        })
+        
         return true
       } else {
         console.error('Edge function failed:', result.error)
@@ -254,10 +371,80 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     }
   },
 
+  saveDraftOrder: async (customer_name: string) => {
+    const { currentOrder } = get()
+    if (!currentOrder) {
+      console.error('No current order found when trying to save draft')
+      return false
+    }
+
+    set({ isLoading: true })
+    try {
+      console.log('OrderStore: Saving draft order with customer:', customer_name)
+      
+      // Update order with customer name and mark as draft
+      await database.updateOrder(currentOrder.id, { 
+        customer_name: customer_name,
+        status: 'draft'
+      })
+      
+      console.log('OrderStore: Draft order saved successfully')
+      return true
+    } catch (error) {
+      console.error('Error saving draft order:', error)
+      return false
+    } finally {
+      set({ isLoading: false })
+    }
+  },
+
+  loadDraftOrder: async (orderId: string) => {
+    set({ isLoading: true })
+    try {
+      console.log('OrderStore: Loading draft order:', orderId)
+      
+      // Get order and items from database
+      const order = await database.getOrder(orderId)
+      const items = await database.getOrderItems(orderId)
+      
+      if (!order) {
+        console.error('Order not found:', orderId)
+        return false
+      }
+      
+      // Convert items to Map
+      const itemsMap = new Map(items.map(item => [item.id, item]))
+      
+      // Set as current order
+      set({
+        currentOrder: order,
+        orderItems: itemsMap,
+        lastScannedEAN: null,
+        lastScannedProduct: null
+      })
+      
+      console.log('OrderStore: Draft order loaded successfully')
+      return true
+    } catch (error) {
+      console.error('Error loading draft order:', error)
+      return false
+    } finally {
+      set({ isLoading: false })
+    }
+  },
+
   syncDraftOrders: async () => {
-    // This method would sync draft orders with the server
-    // For now, it's a placeholder
-    console.log('syncDraftOrders called')
+    set({ isLoading: true })
+    try {
+      console.log('OrderStore: Starting order sync...')
+      await database.syncOrders()
+      console.log('OrderStore: Order sync completed')
+    } catch (error) {
+      console.error('OrderStore: Error syncing orders:', error)
+      throw error
+    } finally {
+      set({ isLoading: false })
+    }
   },
 
   getItemCount: () => {

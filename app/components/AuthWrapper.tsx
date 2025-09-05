@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react'
 import { View, ActivityIndicator, StyleSheet, Text, Alert } from 'react-native'
 import { useAuthStore } from '../state/authStore'
+import { useOrderStore } from '../state/orderStore'
+import { productsCache } from '../lib/productsCache'
 import LoginScreen from '../screens/LoginScreen'
 
 interface AuthWrapperProps {
@@ -9,6 +11,7 @@ interface AuthWrapperProps {
 
 export default function AuthWrapper({ children }: AuthWrapperProps) {
   const { isAuthenticated, isLoading, initializeAuth } = useAuthStore()
+  const { syncDraftOrders } = useOrderStore()
 
   useEffect(() => {
     console.log('AuthWrapper: Starting initialization...')
@@ -18,46 +21,57 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
         console.log('AuthWrapper: Calling initializeAuth...')
         await initializeAuth()
         console.log('AuthWrapper: initializeAuth completed successfully')
-      } catch (error) {
+      } catch (error: any) {
         console.error('AuthWrapper: Error during initialization:', error)
-        Alert.alert('Error', 'Failed to initialize auth: ' + error.message)
+        Alert.alert('Error', 'Failed to initialize auth: ' + (error?.message || 'Unknown error'))
       }
     }
     
     initAuth()
   }, [initializeAuth])
 
-  // Add error boundary for render errors
-  try {
-    console.log('AuthWrapper: Render state - isLoading:', isLoading, 'isAuthenticated:', isAuthenticated)
-
-    if (isLoading) {
-      console.log('AuthWrapper: Showing loading state')
-      return (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Initializing...</Text>
-        </View>
-      )
+  // Auto-sync data when user is authenticated
+  useEffect(() => {
+    if (isAuthenticated && !isLoading) {
+      console.log('AuthWrapper: User authenticated, starting auto-sync...')
+      
+      const autoSync = async () => {
+        try {
+          // Sync products and orders in parallel
+          await Promise.all([
+            productsCache.syncProducts(),
+            syncDraftOrders()
+          ])
+          console.log('AuthWrapper: Auto-sync completed successfully')
+        } catch (error: any) {
+          console.error('AuthWrapper: Error during auto-sync:', error)
+          // Don't show alert for auto-sync errors, just log them
+        }
+      }
+      
+      autoSync()
     }
+  }, [isAuthenticated, isLoading, syncDraftOrders])
 
-    if (!isAuthenticated) {
-      console.log('AuthWrapper: Showing login screen')
-      return <LoginScreen />
-    }
+  console.log('AuthWrapper: Render state - isLoading:', isLoading, 'isAuthenticated:', isAuthenticated)
 
-    console.log('AuthWrapper: Showing main app')
-    return <>{children}</>
-  } catch (error) {
-    console.error('AuthWrapper: Render error:', error)
-    Alert.alert('Render Error', 'Failed to render: ' + error.message)
+  if (isLoading) {
+    console.log('AuthWrapper: Showing loading state')
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorTitle}>Render Error</Text>
-        <Text style={styles.errorText}>{error.message}</Text>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Initializing...</Text>
       </View>
     )
   }
+
+  if (!isAuthenticated) {
+    console.log('AuthWrapper: Showing login screen')
+    return <LoginScreen />
+  }
+
+  console.log('AuthWrapper: Showing main app')
+  return <>{children}</>
 }
 
 const styles = StyleSheet.create({

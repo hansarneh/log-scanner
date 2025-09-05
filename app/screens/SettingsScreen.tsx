@@ -7,7 +7,9 @@ import {
   StyleSheet,
   Alert,
   ScrollView,
-  ActivityIndicator
+  ActivityIndicator,
+  SafeAreaView,
+  Switch
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuthStore } from '../state/authStore'
@@ -20,8 +22,8 @@ export default function SettingsScreen() {
   
   // Form state
   const [fullName, setFullName] = useState(user?.full_name || '')
-  const [fairName, setFairName] = useState(user?.fair_name || '')
-  const [salesRepName, setSalesRepName] = useState(user?.sales_rep_name || '')
+  const [orderEmailNotifications, setOrderEmailNotifications] = useState(true)
+  const [orderSummaryEmail, setOrderSummaryEmail] = useState(user?.email || '')
 
   const handleSave = async () => {
     if (!fullName.trim()) {
@@ -33,9 +35,7 @@ export default function SettingsScreen() {
 
     try {
       const result = await updateProfile({
-        full_name: fullName.trim(),
-        fair_name: fairName.trim(),
-        sales_rep_name: salesRepName.trim()
+        full_name: fullName.trim()
       })
 
       if (result.success) {
@@ -54,8 +54,6 @@ export default function SettingsScreen() {
   const handleCancel = () => {
     // Reset form to current user values
     setFullName(user?.full_name || '')
-    setFairName(user?.fair_name || '')
-    setSalesRepName(user?.sales_rep_name || '')
     setIsEditing(false)
   }
 
@@ -79,59 +77,79 @@ export default function SettingsScreen() {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Settings</Text>
+    <SafeAreaView style={styles.container}>
+      <ScrollView style={styles.scrollContent}>
+        <View style={styles.content}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backButtonText}>← Tilbake</Text>
+          </TouchableOpacity>
+          <Text style={styles.title}>Innstillinger</Text>
         
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Profile Information</Text>
+          <Text style={styles.sectionTitle}>Brukerprofil</Text>
           
           <View style={styles.field}>
-            <Text style={styles.label}>Email</Text>
+            <Text style={styles.label}>E-post</Text>
             <Text style={styles.value}>{user.email}</Text>
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Full Name</Text>
+            <Text style={styles.label}>Fullt navn</Text>
             {isEditing ? (
               <TextInput
                 style={styles.input}
                 value={fullName}
                 onChangeText={setFullName}
-                placeholder="Enter your full name"
+                placeholder="Skriv inn ditt fulle navn"
               />
             ) : (
-              <Text style={styles.value}>{user.full_name || 'Not set'}</Text>
+              <Text style={styles.value}>{user.full_name || 'Ikke satt'}</Text>
             )}
           </View>
 
+
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>E-post preferanser</Text>
+          
           <View style={styles.field}>
-            <Text style={styles.label}>Fair Name</Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.input}
-                value={fairName}
-                onChangeText={setFairName}
-                placeholder="Enter fair name (e.g., Myplant 2025)"
+            <View style={styles.switchField}>
+              <View style={styles.switchLabelContainer}>
+                <Text style={styles.label}>Send ordreoppsummeringer</Text>
+                <Text style={styles.switchDescription}>
+                  Få e-post med ordreoppsummering når ordrer fullføres
+                </Text>
+              </View>
+              <Switch
+                value={orderEmailNotifications}
+                onValueChange={setOrderEmailNotifications}
+                trackColor={{ false: '#E0E0E0', true: '#065A4D' }}
+                thumbColor={orderEmailNotifications ? '#fff' : '#f4f3f4'}
               />
-            ) : (
-              <Text style={styles.value}>{user.fair_name || 'Not set'}</Text>
-            )}
+            </View>
           </View>
 
-          <View style={styles.field}>
-            <Text style={styles.label}>Sales Representative</Text>
-            {isEditing ? (
-              <TextInput
-                style={styles.input}
-                value={salesRepName}
-                onChangeText={setSalesRepName}
-                placeholder="Enter sales rep name"
-              />
-            ) : (
-              <Text style={styles.value}>{user.sales_rep_name || 'Not set'}</Text>
-            )}
-          </View>
+          {orderEmailNotifications && (
+            <View style={styles.field}>
+              <Text style={styles.label}>E-post for ordreoppsummeringer</Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.input}
+                  value={orderSummaryEmail}
+                  onChangeText={setOrderSummaryEmail}
+                  placeholder="E-post adresse for ordreoppsummeringer"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              ) : (
+                <Text style={styles.value}>{orderSummaryEmail || user.email}</Text>
+              )}
+            </View>
+          )}
         </View>
 
         <View style={styles.buttonContainer}>
@@ -182,6 +200,7 @@ export default function SettingsScreen() {
         </TouchableOpacity>
       </View>
     </ScrollView>
+    </SafeAreaView>
   )
 }
 
@@ -192,6 +211,20 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: '#065A4D',
+    fontWeight: '600',
   },
   title: {
     fontSize: 28,
@@ -249,7 +282,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   editButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#065A4D',
   },
   saveButton: {
     backgroundColor: '#34C759',
@@ -273,5 +306,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#FF3B30',
     marginTop: 50,
+  },
+  switchField: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  switchLabelContainer: {
+    flex: 1,
+    marginRight: 16,
+  },
+  switchDescription: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
 })

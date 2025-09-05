@@ -176,7 +176,7 @@ See [DataWedge-Profile.md](android-notes/DataWedge-Profile.md) for comprehensive
 
 ### Key Components
 
-- **HiddenScannerInput**: Receives DataWedge keystrokes
+- **CameraScanner**: Uses device camera for barcode scanning
 - **LineRow**: Displays order items with quantity controls
 - **Totals**: Shows order totals with VAT calculations
 - **OrderStore**: Manages order state and synchronization

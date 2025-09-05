@@ -10,10 +10,11 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  SafeAreaView,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useOrderStore } from '../state/orderStore'
-import { HiddenScannerInput } from '../components/HiddenScannerInput'
+import { CameraScanner } from '../components/CameraScanner'
 import { LineRow } from '../components/LineRow'
 import { Totals } from '../components/Totals'
 import { EmptyState } from '../components/EmptyState'
@@ -27,7 +28,9 @@ export default function ScanScreen() {
     addScannedItem, 
     addManualItem, 
     updateItemQty, 
+    updateItemDiscount,
     removeItem,
+    saveDraftOrder,
     isLoading,
     lastScannedEAN,
     lastScannedProduct
@@ -37,16 +40,42 @@ export default function ScanScreen() {
   const [manualEAN, setManualEAN] = useState('')
   const [manualName, setManualName] = useState('')
   const [manualPrice, setManualPrice] = useState('')
+  
+  const [showDraftModal, setShowDraftModal] = useState(false)
+  const [draftCustomerName, setDraftCustomerName] = useState('')
+  const [showCameraScanner, setShowCameraScanner] = useState(false)
 
   useEffect(() => {
     if (!currentOrder) {
-      router.replace('/')
-      return
+      // Create a new order if none exists
+      const createOrder = async () => {
+        try {
+          const { startNewOrder } = useOrderStore.getState()
+          await startNewOrder({
+            fair_name: 'Fair Scanner',
+            sales_rep: 'User',
+            customer_name: 'Walk-in Customer',
+            customer_email: '',
+            note: ''
+          })
+        } catch (error) {
+          console.error('Error creating order:', error)
+          router.replace('/')
+        }
+      }
+      createOrder()
     }
   }, [currentOrder, router])
 
   const handleScan = async (ean: string) => {
-    await addScannedItem(ean)
+    try {
+      await addScannedItem(ean)
+      // Close camera scanner after successful scan
+      setShowCameraScanner(false)
+    } catch (error) {
+      console.error('Error handling scan:', error)
+      // Could show user feedback here if needed
+    }
   }
 
   const handleManualEntry = async () => {
@@ -62,7 +91,7 @@ export default function ScanScreen() {
     }
 
     try {
-      await addManualItem(manualEAN.trim(), manualName.trim(), price)
+      await addManualItem(manualEAN.trim(), manualName.trim(), price, 0, undefined, undefined)
       setShowManualEntry(false)
       setManualEAN('')
       setManualName('')
@@ -81,11 +110,50 @@ export default function ScanScreen() {
     router.push('/review')
   }
 
+  const handleSaveDraft = () => {
+    if (orderItems.size === 0) {
+      Alert.alert('Feil', 'Legg til minst én vare før du lagrer utkast')
+      return
+    }
+    setShowDraftModal(true)
+  }
+
+  const handleConfirmSaveDraft = async () => {
+    if (!draftCustomerName.trim()) {
+      Alert.alert('Feil', 'Kundenavn er påkrevd')
+      return
+    }
+
+    try {
+      const success = await saveDraftOrder(draftCustomerName.trim())
+      if (success) {
+        Alert.alert('Suksess', 'Utkast lagret!', [
+          {
+            text: 'OK',
+            onPress: () => {
+              setShowDraftModal(false)
+              setDraftCustomerName('')
+              router.push('/orders')
+            }
+          }
+        ])
+      } else {
+        Alert.alert('Feil', 'Kunne ikke lagre utkast')
+      }
+    } catch (error) {
+      console.error('Error saving draft:', error)
+      Alert.alert('Feil', 'Kunne ikke lagre utkast')
+    }
+  }
+
   const renderItem = ({ item }: { item: any }) => (
     <LineRow
       item={item}
       onUpdateQty={updateItemQty}
       onRemove={removeItem}
+      onUpdateDiscount={(itemId, discount_percent, discount_reason) => {
+        updateItemDiscount(itemId, discount_percent, discount_reason)
+      }}
     />
   )
 
@@ -96,10 +164,22 @@ export default function ScanScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <HiddenScannerInput onScan={handleScan} />
+    <SafeAreaView style={styles.container}>
+      {showCameraScanner && (
+        <CameraScanner 
+          onScan={handleScan}
+          onClose={() => setShowCameraScanner(false)}
+          visible={showCameraScanner}
+        />
+      )}
       
       <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.backButtonText}>← Tilbake</Text>
+        </TouchableOpacity>
         <Text style={styles.title}>Skann varer</Text>
         <Text style={styles.customerInfo}>
           {currentOrder.customer_name}
@@ -118,13 +198,22 @@ export default function ScanScreen() {
         </View>
       )}
 
-      {/* Manual entry button */}
-      <TouchableOpacity
-        style={styles.manualEntryButton}
-        onPress={() => setShowManualEntry(true)}
-      >
-        <Text style={styles.manualEntryButtonText}>Legg til manuelt</Text>
-      </TouchableOpacity>
+      {/* Scanner and manual entry buttons */}
+      <View style={styles.buttonRow}>
+        <TouchableOpacity
+          style={styles.scannerButton}
+          onPress={() => setShowCameraScanner(true)}
+        >
+          <Text style={styles.scannerButtonText}>📷 Skann strekkode</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={styles.manualEntryButton}
+          onPress={() => setShowManualEntry(true)}
+        >
+          <Text style={styles.manualEntryButtonText}>✏️ Legg til manuelt</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Order items */}
       {orderItems.size > 0 ? (
@@ -143,20 +232,32 @@ export default function ScanScreen() {
         />
       )}
 
-      {/* Totals and continue button */}
+      {/* Totals and buttons */}
       {orderItems.size > 0 && (
         <>
           <Totals items={Array.from(orderItems.values())} />
           
-          <TouchableOpacity
-            style={[styles.continueButton, isLoading && styles.continueButtonDisabled]}
-            onPress={handleContinue}
-            disabled={isLoading}
-          >
-            <Text style={styles.continueButtonText}>
-              {isLoading ? 'Laster...' : 'Fortsett til gjennomgang'}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={[styles.saveDraftButton, isLoading && styles.saveDraftButtonDisabled]}
+              onPress={handleSaveDraft}
+              disabled={isLoading}
+            >
+              <Text style={styles.saveDraftButtonText}>
+                {isLoading ? 'Laster...' : 'Lagre utkast'}
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.continueButton, isLoading && styles.continueButtonDisabled]}
+              onPress={handleContinue}
+              disabled={isLoading}
+            >
+              <Text style={styles.continueButtonText}>
+                {isLoading ? 'Laster...' : 'Fortsett til gjennomgang'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </>
       )}
 
@@ -224,7 +325,58 @@ export default function ScanScreen() {
           </TouchableOpacity>
         </KeyboardAvoidingView>
       </Modal>
-    </View>
+
+      {/* Draft modal */}
+      <Modal
+        visible={showDraftModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowDraftModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalContent}
+          >
+            <Text style={styles.modalTitle}>Lagre utkast</Text>
+            <Text style={styles.modalSubtitle}>
+              Fyll ut kundenavn for å lagre dette utkastet
+            </Text>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Kundenavn *</Text>
+              <TextInput
+                style={styles.input}
+                value={draftCustomerName}
+                onChangeText={setDraftCustomerName}
+                placeholder="Skriv inn kundenavn"
+                autoCapitalize="words"
+                autoFocus={true}
+              />
+            </View>
+
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => {
+                  setShowDraftModal(false)
+                  setDraftCustomerName('')
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Avbryt</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={handleConfirmSaveDraft}
+              >
+                <Text style={styles.saveButtonText}>Lagre utkast</Text>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+    </SafeAreaView>
   )
 }
 
@@ -238,6 +390,17 @@ const styles = StyleSheet.create({
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: '#065A4D',
+    fontWeight: '600',
   },
   title: {
     fontSize: 24,
@@ -272,9 +435,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
-  manualEntryButton: {
-    backgroundColor: '#34C759',
+  buttonRow: {
+    flexDirection: 'row',
     margin: 20,
+    gap: 12,
+  },
+  scannerButton: {
+    flex: 1,
+    backgroundColor: '#007AFF',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  scannerButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  manualEntryButton: {
+    flex: 1,
+    backgroundColor: '#34C759',
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
@@ -288,7 +468,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   continueButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#065A4D',
     margin: 20,
     padding: 20,
     borderRadius: 12,
@@ -324,7 +504,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   closeButtonText: {
-    color: '#007AFF',
+    color: '#065A4D',
     fontSize: 16,
   },
   modalForm: {
@@ -350,7 +530,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   addButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#065A4D',
     margin: 20,
     padding: 20,
     borderRadius: 12,
@@ -359,6 +539,75 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: 'white',
     fontSize: 18,
+    fontWeight: '600',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    margin: 20,
+    gap: 12,
+  },
+  saveDraftButton: {
+    flex: 1,
+    backgroundColor: '#FF9500',
+    padding: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  saveDraftButtonDisabled: {
+    backgroundColor: '#C7C7CC',
+  },
+  saveDraftButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    margin: 20,
+    borderRadius: 12,
+    padding: 24,
+    width: '90%',
+    maxWidth: 400,
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 24,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#F2F2F7',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  saveButton: {
+    flex: 1,
+    backgroundColor: '#FF9500',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  saveButtonText: {
+    color: 'white',
+    fontSize: 16,
     fontWeight: '600',
   },
 })

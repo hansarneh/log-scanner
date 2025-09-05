@@ -9,6 +9,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  SafeAreaView,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useOrderStore } from '../state/orderStore'
@@ -41,7 +42,7 @@ export default function NewOrderScreen() {
         customer_email: customerEmail.trim() || undefined,
       })
       
-      router.push('/scan')
+      router.push('/cart?scan=true')
     } catch (error) {
       console.error('Error starting order:', error)
       Alert.alert('Feil', 'Kunne ikke opprette ordre')
@@ -51,15 +52,22 @@ export default function NewOrderScreen() {
   }
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Ny Ordre</Text>
-          <Text style={styles.subtitle}>{fairName}</Text>
-        </View>
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView 
+        style={styles.keyboardContainer} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.header}>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
+              <Text style={styles.backButtonText}>← Tilbake</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>Ny Ordre</Text>
+            <Text style={styles.subtitle}>{fairName}</Text>
+          </View>
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
@@ -110,6 +118,7 @@ export default function NewOrderScreen() {
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
+    </SafeAreaView>
   )
 }
 
@@ -117,6 +126,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8F9FA',
+  },
+  keyboardContainer: {
+    flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
@@ -126,6 +138,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 40,
     marginTop: 20,
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: '#065A4D',
+    fontWeight: '600',
   },
   title: {
     fontSize: 28,
@@ -159,7 +182,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   button: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#065A4D',
     borderRadius: 12,
     padding: 20,
     alignItems: 'center',

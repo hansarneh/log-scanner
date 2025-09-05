@@ -9,7 +9,8 @@ import {
   ScrollView,
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  SafeAreaView
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { supabase } from '../lib/supabase'
@@ -122,15 +123,22 @@ export default function AddProductScreen() {
   }
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Legg til produkt</Text>
-          <Text style={styles.subtitle}>Opprett nytt produkt i databasen</Text>
-        </View>
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView 
+        style={styles.keyboardContainer} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+          <View style={styles.header}>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
+              <Text style={styles.backButtonText}>← Tilbake</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>Legg til produkt</Text>
+            <Text style={styles.subtitle}>Opprett nytt produkt i databasen</Text>
+          </View>
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
@@ -224,6 +232,7 @@ export default function AddProductScreen() {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+    </SafeAreaView>
   )
 }
 
@@ -231,6 +240,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  keyboardContainer: {
+    flex: 1,
   },
   scrollView: {
     flex: 1,
@@ -242,6 +254,17 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 32,
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: '#065A4D',
+    fontWeight: '600',
   },
   title: {
     fontSize: 28,
@@ -292,7 +315,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   scanButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#065A4D',
     borderRadius: 8,
     padding: 12,
     alignItems: 'center',
@@ -321,7 +344,7 @@ const styles = StyleSheet.create({
   secondaryButton: {
     backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: '#065A4D',
   },
   buttonDisabled: {
     backgroundColor: '#ccc',
@@ -332,7 +355,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   secondaryButtonText: {
-    color: '#007AFF',
+    color: '#065A4D',
     fontSize: 16,
     fontWeight: '600',
   },

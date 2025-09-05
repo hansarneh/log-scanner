@@ -8,11 +8,14 @@ import {
   TextInput,
   Alert,
   ScrollView,
+  SafeAreaView,
+  Platform,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useOrderStore } from '../state/orderStore'
 import { LineRow } from '../components/LineRow'
 import { Totals } from '../components/Totals'
+import { CustomDialog } from '../components/CustomDialog'
 import { LocalOrderItem } from '../lib/db'
 
 export default function ReviewScreen() {
@@ -21,12 +24,17 @@ export default function ReviewScreen() {
     currentOrder, 
     orderItems, 
     updateItemQty, 
+    updateItemDiscount,
     removeItem,
+    updateOrderDetails,
     finalizeOrder,
     isLoading
   } = useOrderStore()
   
+  const [customerName, setCustomerName] = useState('')
+  const [deliveryDate, setDeliveryDate] = useState<Date | null>(null)
   const [note, setNote] = useState(currentOrder?.note || '')
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
 
   useEffect(() => {
     if (!currentOrder) {
@@ -35,9 +43,43 @@ export default function ReviewScreen() {
     }
   }, [currentOrder, router])
 
+  const showDatePickerAlert = () => {
+    const today = new Date()
+    const options = []
+    
+    // Generer de neste 30 dagene
+    for (let i = 0; i < 30; i++) {
+      const date = new Date(today)
+      date.setDate(today.getDate() + i)
+      const dateStr = date.toLocaleDateString('nb-NO')
+      options.push(dateStr)
+    }
+    
+    Alert.alert(
+      'Velg leveringsdato',
+      'Velg ønsket leveringsdato:',
+      [
+        ...options.map((dateStr, index) => ({
+          text: dateStr,
+          onPress: () => {
+            const selectedDate = new Date(today)
+            selectedDate.setDate(today.getDate() + index)
+            setDeliveryDate(selectedDate)
+          }
+        })),
+        { text: 'Avbryt', style: 'cancel' }
+      ]
+    )
+  }
+
   const handleFinalizeOrder = async () => {
     if (orderItems.size === 0) {
       Alert.alert('Feil', 'Ingen varer å sende')
+      return
+    }
+
+    if (!customerName.trim()) {
+      Alert.alert('Feil', 'Kundenavn er påkrevd')
       return
     }
 
@@ -51,18 +93,16 @@ export default function ReviewScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              // First save order details
+              await updateOrderDetails(
+                customerName.trim(),
+                deliveryDate ? deliveryDate.toISOString() : undefined
+              )
+              
+              // Then finalize the order
               const success = await finalizeOrder(note.trim() || undefined)
               if (success) {
-                Alert.alert(
-                  'Suksess!',
-                  'Ordren er sendt og e-post er sendt til kunden.',
-                  [
-                    {
-                      text: 'OK',
-                      onPress: () => router.replace('/orders')
-                    }
-                  ]
-                )
+                setShowSuccessDialog(true)
               } else {
                 Alert.alert('Feil', 'Kunne ikke sende ordren. Prøv igjen senere.')
               }
@@ -76,11 +116,19 @@ export default function ReviewScreen() {
     )
   }
 
+  const handleSuccessDialogClose = () => {
+    setShowSuccessDialog(false)
+    router.replace('/')
+  }
+
   const renderItem = ({ item }: { item: LocalOrderItem }) => (
     <LineRow
       item={item}
       onUpdateQty={updateItemQty}
       onRemove={removeItem}
+      onUpdateDiscount={(itemId, discount_percent, discount_reason) => {
+        updateItemDiscount(itemId, discount_percent, discount_reason)
+      }}
     />
   )
 
@@ -91,48 +139,67 @@ export default function ReviewScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
         <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backButtonText}>← Tilbake</Text>
+          </TouchableOpacity>
           <Text style={styles.title}>Gjennomgang</Text>
-          <Text style={styles.customerInfo}>
-            {currentOrder.customer_name}
-            {currentOrder.sales_rep && ` • ${currentOrder.sales_rep}`}
-          </Text>
+          <TouchableOpacity
+            style={[styles.finalizeButton, isLoading && styles.finalizeButtonDisabled]}
+            onPress={handleFinalizeOrder}
+            disabled={isLoading || orderItems.size === 0}
+          >
+            <Text style={styles.finalizeButtonIcon}>✓</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Order summary */}
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Ordresammendrag</Text>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Ordre-ID:</Text>
-            <Text style={styles.summaryValue}>{currentOrder.id}</Text>
+        {/* Customer details */}
+        <View style={styles.customerCard}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Kundenavn *</Text>
+            <TextInput
+              style={styles.textInput}
+              value={customerName}
+              onChangeText={setCustomerName}
+              placeholder="Skriv inn kundenavn"
+              autoCapitalize="words"
+            />
           </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Dato:</Text>
-            <Text style={styles.summaryValue}>
-              {new Date(currentOrder.created_at).toLocaleDateString('nb-NO')}
-            </Text>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Ønsket leveringsdato (valgfritt)</Text>
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={showDatePickerAlert}
+            >
+              <Text style={styles.dateButtonText}>
+                {deliveryDate 
+                  ? deliveryDate.toLocaleDateString('nb-NO')
+                  : 'Velg leveringsdato'
+                }
+              </Text>
+            </TouchableOpacity>
           </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Messe:</Text>
-            <Text style={styles.summaryValue}>{currentOrder.fair_name}</Text>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Notat (valgfritt)</Text>
+            <TextInput
+              style={styles.noteInput}
+              value={note}
+              onChangeText={setNote}
+              placeholder="Legg til notat til ordren..."
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+            />
           </View>
         </View>
 
-        {/* Note field */}
-        <View style={styles.noteSection}>
-          <Text style={styles.noteLabel}>Notat (valgfritt)</Text>
-          <TextInput
-            style={styles.noteInput}
-            value={note}
-            onChangeText={setNote}
-            placeholder="Legg til notat til ordren..."
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
-          />
-        </View>
 
         {/* Order items */}
         <View style={styles.itemsSection}>
@@ -150,19 +217,15 @@ export default function ReviewScreen() {
         <Totals items={Array.from(orderItems.values())} />
       </ScrollView>
 
-      {/* Finalize button */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.finalizeButton, isLoading && styles.finalizeButtonDisabled]}
-          onPress={handleFinalizeOrder}
-          disabled={isLoading || orderItems.size === 0}
-        >
-          <Text style={styles.finalizeButtonText}>
-            {isLoading ? 'Sender...' : 'Fullfør og send'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+      {/* Success Dialog */}
+      <CustomDialog
+        visible={showSuccessDialog}
+        title="Ordre fullført!"
+        message="Ordren er sendt og e-post er sendt til kunden."
+        onClose={handleSuccessDialogClose}
+        buttonText="OK"
+      />
+    </SafeAreaView>
   )
 }
 
@@ -175,22 +238,31 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     backgroundColor: 'white',
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
   },
+  backButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: '#065A4D',
+    fontWeight: '600',
+  },
   title: {
     fontSize: 24,
     fontWeight: '700',
     color: '#333',
-    marginBottom: 4,
+    flex: 1,
+    textAlign: 'center',
   },
-  customerInfo: {
-    fontSize: 16,
-    color: '#666',
-  },
-  summaryCard: {
+  customerCard: {
     backgroundColor: 'white',
     margin: 20,
     padding: 20,
@@ -198,49 +270,44 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },
-  summaryTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+  inputGroup: {
     marginBottom: 16,
   },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: '#666',
-  },
-  summaryValue: {
+  inputLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: '#333',
+    marginBottom: 8,
   },
-  noteSection: {
-    backgroundColor: 'white',
-    margin: 20,
-    padding: 20,
-    borderRadius: 12,
+  textInput: {
     borderWidth: 1,
     borderColor: '#E0E0E0',
-  },
-  noteLabel: {
+    borderRadius: 8,
+    padding: 12,
     fontSize: 16,
-    fontWeight: '600',
     color: '#333',
-    marginBottom: 12,
+    backgroundColor: 'white',
+  },
+  dateButton: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: 'white',
+  },
+  dateButtonText: {
+    fontSize: 16,
+    color: '#333',
   },
   noteInput: {
     borderWidth: 1,
     borderColor: '#E0E0E0',
     borderRadius: 8,
-    padding: 16,
+    padding: 12,
     fontSize: 16,
     color: '#333',
     minHeight: 80,
+    textAlignVertical: 'top',
   },
   itemsSection: {
     backgroundColor: 'white',
@@ -258,24 +325,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
   },
-  footer: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-  },
   finalizeButton: {
-    backgroundColor: '#34C759',
-    borderRadius: 12,
-    padding: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#065A4D',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   finalizeButtonDisabled: {
     backgroundColor: '#C7C7CC',
   },
-  finalizeButtonText: {
+  finalizeButtonIcon: {
     color: 'white',
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: '600',
   },
 })
