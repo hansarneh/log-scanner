@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native'
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera'
 import * as Haptics from 'expo-haptics'
@@ -15,10 +15,11 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
   visible = true 
 }) => {
   const [permission, requestPermission] = useCameraPermissions()
-  const [scanned, setScanned] = useState(false)
+  const [lastScan, setLastScan] = useState<string | null>(null)
   const [isActive, setIsActive] = useState(visible)
   const [hasError, setHasError] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const cameraRef = useRef<CameraView>(null)
 
   // Error boundary for camera component
   if (hasError) {
@@ -32,7 +33,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
             onPress={() => {
               setHasError(false)
               setErrorMessage('')
-              setScanned(false)
+              setLastScan(null)
             }}
           >
             <Text style={styles.buttonText}>Prøv igjen</Text>
@@ -53,38 +54,33 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
   useEffect(() => {
     setIsActive(visible)
     if (visible) {
-      setScanned(false)
+      setLastScan(null)
     }
   }, [visible])
 
-  const handleBarcodeScanned = ({ type, data }: { type: string; data: string }) => {
-    if (scanned) {
-      return
-    }
+  const handleModernBarcodeScanned = (result: { data: string; type: string }) => {
+    const { data, type } = result
     
-    setScanned(true)
+    if (!data) return
+    
+    // Debounce: avoid spam by checking last scanned value
+    if (data === lastScan) return
     
     // Validate EAN length (8-13 digits)
     if (data.length >= 8 && data.length <= 13 && /^\d+$/.test(data)) {
+      setLastScan(data)
+      
       // Provide haptic feedback
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       
       // Call the onScan callback
       onScan(data)
       
-      // Reset after a short delay
-      setTimeout(() => {
-        setScanned(false)
-      }, 1000)
+      console.log('EAN funnet:', type, data)
     } else {
       // Invalid barcode
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
       Alert.alert('Ugyldig strekkode', `Strekkoden må være 8-13 siffer. Fikk: "${data}" (${data.length} tegn)`)
-      
-      // Reset after error
-      setTimeout(() => {
-        setScanned(false)
-      }, 1000)
     }
   }
 
@@ -145,9 +141,10 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
   return (
     <View style={styles.container}>
       <CameraView
-        onBarcodeScanned={scanned ? undefined : handleBarcodeScanned}
+        ref={cameraRef}
+        onModernBarcodeScanned={handleModernBarcodeScanned}
         barcodeScannerSettings={{
-          barcodeTypes: ['ean13', 'ean8', 'code128', 'code39'],
+          barcodeTypes: ['ean13', 'ean8'] as const,
         }}
         style={StyleSheet.absoluteFillObject}
         facing="back"
@@ -168,12 +165,12 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
         </View>
         
         <Text style={styles.instructionText}>
-          Rette kameraet mot strekkoden
+          Sikt mot strekkoden – støtter EAN-8 og EAN-13
         </Text>
         
-        {scanned && (
+        {lastScan && (
           <View style={styles.scannedOverlay}>
-            <Text style={styles.scannedText}>✓ Skannet!</Text>
+            <Text style={styles.scannedText}>✓ Skannet: {lastScan}</Text>
           </View>
         )}
         
@@ -181,7 +178,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
         {__DEV__ && (
           <TouchableOpacity 
             style={styles.testButton}
-            onPress={() => handleBarcodeScanned({ type: 'ean13', data: '1234567890123' })}
+            onPress={() => handleModernBarcodeScanned({ type: 'ean13', data: '1234567890123' })}
           >
             <Text style={styles.testButtonText}>Test Scan</Text>
           </TouchableOpacity>
