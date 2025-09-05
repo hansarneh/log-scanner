@@ -13,18 +13,20 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Tillat appen til å bruke kameraet for å skanne strekkoder.",
         "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to access your microphone"
-      }
+      },
+      "bundleIdentifier": "com.hansarne.fairscanner"
     },
     "android": {
       "permissions": [
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "plugins": [
       [
         "expo-camera",
         {
-          "cameraPermission": "Tillat appen til å bruke kameraet for å skanne strekkoder."
+          "cameraPermission": "Appen trenger kamera for å skanne EAN-strekkoder"
         }
       ]
     ],

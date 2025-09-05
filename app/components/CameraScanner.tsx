@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native'
-import { Camera, CameraView, useCameraPermissions } from 'expo-camera'
+import React, { useEffect, useState, useRef } from 'react'
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native'
+import { Camera } from 'expo-camera'
 import * as Haptics from 'expo-haptics'
 import Constants from 'expo-constants'
 
@@ -15,15 +15,29 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
   onClose,
   visible = true 
 }) => {
-  const [permission, requestPermission] = useCameraPermissions()
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null)
   const [lastScan, setLastScan] = useState<string | null>(null)
-  const [isActive, setIsActive] = useState(visible)
-  const [hasError, setHasError] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
-  const cameraRef = useRef<CameraView>(null)
+  const [scanningEnabled, setScanningEnabled] = useState(true)
+  const cameraRef = useRef<Camera | null>(null)
 
   // Check if running in simulator
   const isSimulator = Constants.platform?.ios?.simulator || Constants.platform?.android?.emulator
+
+  useEffect(() => {
+    if (!visible) return
+    
+    const requestPermission = async () => {
+      try {
+        const { status } = await Camera.requestCameraPermissionsAsync()
+        setHasPermission(status === 'granted')
+      } catch (error) {
+        console.error('Error requesting camera permission:', error)
+        setHasPermission(false)
+      }
+    }
+    
+    requestPermission()
+  }, [visible])
 
   // Show simulator message instead of camera
   if (isSimulator) {
@@ -38,7 +52,11 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
           {__DEV__ && (
             <TouchableOpacity 
               style={styles.testButton}
-              onPress={() => handleBarcodeScanned({ type: 'ean13', data: '1234567890123' })}
+              onPress={() => {
+                const testEAN = '1234567890123'
+                setLastScan(testEAN)
+                onScan(testEAN)
+              }}
             >
               <Text style={styles.testButtonText}>Test Scan (Simulator)</Text>
             </TouchableOpacity>
@@ -56,78 +74,17 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
     )
   }
 
-  // Error boundary for camera component
-  if (hasError) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorTitle}>Kamera-feil</Text>
-          <Text style={styles.errorText}>{errorMessage || 'Kunne ikke åpne kamera'}</Text>
-          <TouchableOpacity 
-            style={styles.button}
-            onPress={() => {
-              setHasError(false)
-              setErrorMessage('')
-              setLastScan(null)
-            }}
-          >
-            <Text style={styles.buttonText}>Prøv igjen</Text>
-          </TouchableOpacity>
-          {onClose && (
-            <TouchableOpacity 
-              style={[styles.button, { marginTop: 10, backgroundColor: '#666' }]}
-              onPress={onClose}
-            >
-              <Text style={styles.buttonText}>Lukk</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    )
-  }
-
-  useEffect(() => {
-    setIsActive(visible)
-    if (visible) {
-      setLastScan(null)
-    }
-  }, [visible])
-
-  const handleBarcodeScanned = ({ type, data }: { type: string; data: string }) => {
-    if (!data) return
-    
-    // Debounce: avoid spam by checking last scanned value
-    if (data === lastScan) return
-    
-    // Validate EAN length (8-13 digits)
-    if (data.length >= 8 && data.length <= 13 && /^\d+$/.test(data)) {
-      setLastScan(data)
-      
-      // Provide haptic feedback
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-      
-      // Call the onScan callback
-      onScan(data)
-      
-      console.log('EAN funnet:', type, data)
-    } else {
-      // Invalid barcode
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
-      Alert.alert('Ugyldig strekkode', `Strekkoden må være 8-13 siffer. Fikk: "${data}" (${data.length} tegn)`)
-    }
-  }
-
-  if (!permission) {
+  if (hasPermission === null) {
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.message}>Ber om kamera-tillatelse...</Text>
+          <Text style={styles.message}>Ber om kameratilgang…</Text>
         </View>
       </View>
     )
   }
 
-  if (!permission.granted) {
+  if (!hasPermission) {
     return (
       <View style={styles.container}>
         <View style={styles.permissionContainer}>
@@ -139,15 +96,11 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
             style={styles.button}
             onPress={async () => {
               try {
-                const result = await requestPermission()
-                if (!result.granted) {
-                  setErrorMessage('Kamera-tillatelse ble avvist. Vennligst gå til innstillinger og aktiver kamera-tilgang.')
-                  setHasError(true)
-                }
+                const { status } = await Camera.requestCameraPermissionsAsync()
+                setHasPermission(status === 'granted')
               } catch (error) {
                 console.error('Error requesting camera permission:', error)
-                setErrorMessage('Kunne ikke be om kamera-tillatelse')
-                setHasError(true)
+                Alert.alert('Feil', 'Kunne ikke be om kamera-tillatelse')
               }
             }}
           >
@@ -166,25 +119,50 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
     )
   }
 
-
-  if (!isActive) {
+  if (!visible) {
     return null
+  }
+
+  const handleBarcodeScanned = ({ data, type }: { data: string; type: string }) => {
+    if (!data) return
+    
+    // Validate EAN length (8-13 digits)
+    if (data.length >= 8 && data.length <= 13 && /^\d+$/.test(data)) {
+      if (data !== lastScan) {
+        setLastScan(data)
+        setScanningEnabled(false)        // debounce 1
+        setTimeout(() => setScanningEnabled(true), 1200) // debounce 2
+        
+        // Provide haptic feedback
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+        
+        // Call the onScan callback
+        onScan(data)
+        
+        console.log('EAN funnet:', type, data)
+      }
+    } else {
+      // Invalid barcode
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
+      Alert.alert('Ugyldig strekkode', `Strekkoden må være 8-13 siffer. Fikk: "${data}" (${data.length} tegn)`)
+    }
   }
 
   return (
     <View style={styles.container}>
-      <CameraView
-        ref={cameraRef}
-        onBarcodeScanned={handleBarcodeScanned}
-        barcodeScannerSettings={{
-          barcodeTypes: ['ean13', 'ean8'],
-        }}
-        style={StyleSheet.absoluteFillObject}
-        facing="back"
-        onError={(error) => {
-          console.error('CameraScanner: Camera error:', error)
-          setErrorMessage(`Kamera-feil: ${error.message || 'Ukjent feil'}`)
-          setHasError(true)
+      <Camera
+        ref={(r) => (cameraRef.current = r)}
+        style={StyleSheet.absoluteFill}
+        ratio="16:9"
+        // NB: SDK 50 bruker "onBarCodeScanned" (ikke modern-API)
+        onBarCodeScanned={
+          scanningEnabled
+            ? handleBarcodeScanned
+            : undefined
+        }
+        // Begrens til EAN-typer for bedre ytelse
+        barCodeScannerSettings={{
+          barCodeTypes: ['ean13', 'ean8'],
         }}
       />
       
@@ -198,23 +176,13 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
         </View>
         
         <Text style={styles.instructionText}>
-          Sikt mot strekkoden – støtter EAN-8 og EAN-13
+          Sikt mot strekkoden (EAN-8/13)
         </Text>
         
         {lastScan && (
           <View style={styles.scannedOverlay}>
             <Text style={styles.scannedText}>✓ Skannet: {lastScan}</Text>
           </View>
-        )}
-        
-        {/* Test button for debugging */}
-        {__DEV__ && (
-          <TouchableOpacity 
-            style={styles.testButton}
-            onPress={() => handleBarcodeScanned({ type: 'ean13', data: '1234567890123' })}
-          >
-            <Text style={styles.testButtonText}>Test Scan</Text>
-          </TouchableOpacity>
         )}
       </View>
       
@@ -331,37 +299,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
-  message: {
-    color: 'white',
-    fontSize: 18,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  button: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  buttonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  testButton: {
-    position: 'absolute',
-    bottom: 100,
-    left: 20,
-    backgroundColor: 'rgba(255, 0, 0, 0.8)',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  testButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -383,25 +320,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     opacity: 0.8,
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    padding: 20,
-  },
-  errorTitle: {
-    color: 'white',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  errorText: {
-    color: 'white',
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
   simulatorContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -422,5 +340,34 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 20,
+  },
+  message: {
+    color: 'white',
+    fontSize: 18,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  button: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  testButton: {
+    backgroundColor: 'rgba(255, 0, 0, 0.8)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  testButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
 })
