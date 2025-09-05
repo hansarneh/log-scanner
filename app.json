@@ -1,8 +1,9 @@
 {
-  "expo": {
-    "name": "Fair Scanner",
-    "slug": "fairscanner",
-    "version": "1.0.0",
+      "expo": {
+      "name": "Fair Scanner",
+      "slug": "fairscanner",
+      "version": "1.0.0",
+      "scheme": "fairscanner",
     "assetBundlePatterns": [
       "**/*"
     ],

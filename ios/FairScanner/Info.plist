@@ -27,21 +27,12 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>fairscanner</string>
-          <string>com.fairscanner.app</string>
-        </array>
-      </dict>
-      <dict>
-        <key>CFBundleURLSchemes</key>
-        <array>
-          <string>exp+fairscanner</string>
+          <string>com.hansarne.fairscanner</string>
         </array>
       </dict>
     </array>
     <key>CFBundleVersion</key>
     <string>1</string>
-    <key>ITSAppUsesNonExemptEncryption</key>
-    <false/>
     <key>LSRequiresIPhoneOS</key>
     <true/>
     <key>NSAppTransportSecurity</key>
@@ -69,6 +60,8 @@
     <array>
       <string>UIInterfaceOrientationPortrait</string>
       <string>UIInterfaceOrientationPortraitUpsideDown</string>
+      <string>UIInterfaceOrientationLandscapeLeft</string>
+      <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
     <key>UISupportedInterfaceOrientations~ipad</key>
     <array>

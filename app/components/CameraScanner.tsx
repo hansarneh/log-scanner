@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native'
 import { Camera } from 'expo-camera'
-import * as Haptics from 'expo-haptics'
+import { notificationAsync, NotificationFeedbackType } from 'expo-haptics'
 import Constants from 'expo-constants'
 
 interface CameraScannerProps {
@@ -20,8 +20,9 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
   const [scanningEnabled, setScanningEnabled] = useState(true)
   const cameraRef = useRef<Camera | null>(null)
 
-  // Check if running in simulator
-  const isSimulator = Constants.platform?.ios?.simulator || Constants.platform?.android?.emulator
+  // Simulator-sjekk (robust på tvers av SDK 50)
+  const isSimulator =
+    (Constants?.isDevice === false) && (Platform.OS === 'ios' || Platform.OS === 'android')
 
   useEffect(() => {
     if (!visible) return
@@ -124,27 +125,33 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
   }
 
   const handleBarcodeScanned = ({ data, type }: { data: string; type: string }) => {
-    if (!data) return
+    console.log('🔍 Barcode scanned:', { data, type, length: data?.length })
     
-    // Validate EAN length (8-13 digits)
-    if (data.length >= 8 && data.length <= 13 && /^\d+$/.test(data)) {
+    if (!data) {
+      console.log('❌ No data in barcode')
+      return
+    }
+    
+    // EAN validering (8–13 siffer) - mer fleksibel
+    if (/^\d{8,13}$/.test(data) || data.length >= 8) {
       if (data !== lastScan) {
         setLastScan(data)
         setScanningEnabled(false)        // debounce 1
-        setTimeout(() => setScanningEnabled(true), 1200) // debounce 2
+        setTimeout(() => setScanningEnabled(true), 500) // debounce 2
         
         // Provide haptic feedback
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+        notificationAsync(NotificationFeedbackType.Success)
         
         // Call the onScan callback
         onScan(data)
         
-        console.log('EAN funnet:', type, data)
+        console.log('✅ EAN funnet og lagt til:', type, data)
       }
     } else {
       // Invalid barcode
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
-      Alert.alert('Ugyldig strekkode', `Strekkoden må være 8-13 siffer. Fikk: "${data}" (${data.length} tegn)`)
+      console.log('❌ Ugyldig strekkode:', { data, type, length: data.length })
+      notificationAsync(NotificationFeedbackType.Error)
+      Alert.alert('Ugyldig strekkode', `Strekkoden må være 8–13 siffer. Fikk: "${data}" (${data.length} tegn).`)
     }
   }
 
@@ -162,7 +169,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
         }
         // Begrens til EAN-typer for bedre ytelse
         barCodeScannerSettings={{
-          barCodeTypes: ['ean13', 'ean8'],
+          barCodeTypes: ['ean13', 'ean8', 'code128', 'code39', 'upc_a', 'upc_e'],
         }}
       />
       
