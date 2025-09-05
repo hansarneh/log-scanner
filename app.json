@@ -3,13 +3,31 @@
     "name": "Fair Scanner",
     "slug": "fairscanner",
     "version": "1.0.0",
-    "scheme": "fairscanner",
     "assetBundlePatterns": [
       "**/*"
     ],
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "ios": {
+      "infoPlist": {
+        "NSCameraUsageDescription": "Tillat appen til å bruke kameraet for å skanne strekkoder.",
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to access your microphone"
+      }
+    },
+    "android": {
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Tillat appen til å bruke kameraet for å skanne strekkoder."
+        }
+      ]
+    ],
     "extra": {
       "router": {
         "origin": false
