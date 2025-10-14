@@ -4,20 +4,30 @@ import { Camera } from 'expo-camera'
 import { notificationAsync, NotificationFeedbackType } from 'expo-haptics'
 import Constants from 'expo-constants'
 
+export interface ScanFeedback {
+  ean: string
+  productName?: string
+  price?: number
+  found: boolean
+}
+
 interface CameraScannerProps {
   onScan: (ean: string) => void
   onClose?: () => void
   visible?: boolean
+  lastScanFeedback?: ScanFeedback
 }
 
 export const CameraScanner: React.FC<CameraScannerProps> = ({ 
   onScan, 
   onClose,
-  visible = true 
+  visible = true,
+  lastScanFeedback
 }) => {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
   const [lastScan, setLastScan] = useState<string | null>(null)
   const [scanningEnabled, setScanningEnabled] = useState(true)
+  const [showFeedback, setShowFeedback] = useState(false)
   const cameraRef = useRef<Camera | null>(null)
 
   // Simulator-sjekk (robust på tvers av SDK 50)
@@ -26,10 +36,6 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
 
   useEffect(() => {
     if (!visible) return
-    
-    // Midlertidige logger for debugging
-    console.log('Types:', Camera.Constants.BarCodeType)
-    Camera.getCameraPermissionsAsync().then(p => console.log('Permission:', p))
     
     const requestPermission = async () => {
       try {
@@ -131,32 +137,38 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
   const handleBarcodeScanned = ({ data, type }: { data: string; type: string }) => {
     console.log('🔍 Barcode scanned:', { data, type, length: data?.length })
     
-    if (!data) {
-      console.log('❌ No data in barcode')
+    if (!data || !scanningEnabled) {
       return
     }
     
-    // EAN validering (8–13 siffer) - mer fleksibel
-    if (/^\d{8,13}$/.test(data) || data.length >= 8) {
-      if (data !== lastScan) {
-        setLastScan(data)
-        setScanningEnabled(false)        // debounce 1
-        setTimeout(() => setScanningEnabled(true), 500) // debounce 2
-        
-        // Provide haptic feedback
-        notificationAsync(NotificationFeedbackType.Success)
-        
-        // Call the onScan callback
-        onScan(data)
-        
-        console.log('✅ EAN funnet og lagt til:', type, data)
-      }
-    } else {
-      // Invalid barcode
+    // Streng EAN-validering: KUN siffer, 8-13 lengde
+    if (!/^\d{8,13}$/.test(data)) {
       console.log('❌ Ugyldig strekkode:', { data, type, length: data.length })
       notificationAsync(NotificationFeedbackType.Error)
-      Alert.alert('Ugyldig strekkode', `Strekkoden må være 8–13 siffer. Fikk: "${data}" (${data.length} tegn).`)
+      Alert.alert(
+        'Ugyldig strekkode', 
+        `Kun EAN-8/EAN-13 strekkoder støttes.\nSkannet: "${data}" (${data.length} tegn)`
+      )
+      return
     }
+    
+    // Deaktiver skanning midlertidig for å unngå duplikater
+    setScanningEnabled(false)
+    setTimeout(() => setScanningEnabled(true), 800)
+    
+    setLastScan(data)
+    setShowFeedback(true)
+    
+    // Skjul feedback etter 2 sekunder
+    setTimeout(() => setShowFeedback(false), 2000)
+    
+    // Haptic feedback
+    notificationAsync(NotificationFeedbackType.Success)
+    
+    // Call the onScan callback
+    onScan(data)
+    
+    console.log('✅ EAN funnet og lagt til:', type, data)
   }
 
   return (
@@ -194,9 +206,26 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
           Sikt mot strekkoden (EAN-8/13)
         </Text>
         
-        {lastScan && (
-          <View style={styles.scannedOverlay}>
-            <Text style={styles.scannedText}>✓ Skannet: {lastScan}</Text>
+        {showFeedback && lastScanFeedback && (
+          <View style={[
+            styles.scannedOverlay, 
+            !lastScanFeedback.found && styles.scannedOverlayError
+          ]}>
+            {lastScanFeedback.found ? (
+              <>
+                <Text style={styles.scannedText}>✓ {lastScanFeedback.productName}</Text>
+                {lastScanFeedback.price !== undefined && (
+                  <Text style={styles.scannedPrice}>{lastScanFeedback.price.toFixed(2)} kr</Text>
+                )}
+                <Text style={styles.scannedEAN}>EAN: {lastScanFeedback.ean}</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.scannedText}>⚠️ Produkt ikke funnet</Text>
+                <Text style={styles.scannedEAN}>EAN: {lastScanFeedback.ean}</Text>
+                <Text style={styles.scannedHint}>Legg til manuelt fra skjermen</Text>
+              </>
+            )}
           </View>
         )}
       </View>
@@ -285,18 +314,41 @@ const styles = StyleSheet.create({
   },
   scannedOverlay: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -50 }, { translateY: -50 }],
-    backgroundColor: 'rgba(0, 255, 0, 0.8)',
+    bottom: 120,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(0, 255, 0, 0.95)',
     paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  scannedOverlayError: {
+    backgroundColor: 'rgba(255, 152, 0, 0.95)',
   },
   scannedText: {
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  scannedPrice: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  scannedEAN: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 12,
+    marginTop: 4,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  scannedHint: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 13,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   closeButton: {
     position: 'absolute',

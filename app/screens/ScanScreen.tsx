@@ -70,11 +70,9 @@ export default function ScanScreen() {
   const handleScan = async (ean: string) => {
     try {
       await addScannedItem(ean)
-      // Close camera scanner after successful scan
-      setShowCameraScanner(false)
+      // Note: Keep camera open to show feedback and allow continuous scanning
     } catch (error) {
       console.error('Error handling scan:', error)
-      // Could show user feedback here if needed
     }
   }
 
@@ -163,6 +161,14 @@ export default function ScanScreen() {
     return null
   }
 
+  // Create feedback object for camera scanner
+  const scanFeedback = lastScannedEAN ? {
+    ean: lastScannedEAN,
+    productName: lastScannedProduct?.name,
+    price: lastScannedProduct?.price_kr,
+    found: !!lastScannedProduct
+  } : undefined
+
   return (
     <SafeAreaView style={styles.container}>
       {showCameraScanner && (
@@ -170,6 +176,7 @@ export default function ScanScreen() {
           onScan={handleScan}
           onClose={() => setShowCameraScanner(false)}
           visible={showCameraScanner}
+          lastScanFeedback={scanFeedback}
         />
       )}
       
