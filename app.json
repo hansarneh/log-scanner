@@ -1,27 +1,14 @@
 {
-      "expo": {
-      "name": "Fair Scanner",
-      "slug": "fairscanner",
-      "version": "1.0.0",
-      "scheme": "fairscanner",
+  "expo": {
+    "name": "Fair Scanner",
+    "slug": "fairscanner",
+    "version": "1.0.0",
+    "scheme": "fairscanner",
     "assetBundlePatterns": [
       "**/*"
     ],
     "web": {
       "favicon": "./assets/favicon.png"
-    },
-    "ios": {
-      "infoPlist": {
-        "NSCameraUsageDescription": "Tillat appen til å bruke kameraet for å skanne strekkoder.",
-        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to access your microphone"
-      },
-      "bundleIdentifier": "com.hansarne.fairscanner"
-    },
-    "android": {
-      "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
-      ]
     },
     "plugins": [
       [

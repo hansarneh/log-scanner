@@ -27,6 +27,7 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
+          <string>fairscanner</string>
           <string>com.hansarne.fairscanner</string>
         </array>
       </dict>
@@ -43,7 +44,7 @@
       <true/>
     </dict>
     <key>NSCameraUsageDescription</key>
-    <string>Tillat appen til å bruke kameraet for å skanne strekkoder.</string>
+    <string>Appen trenger kamera for å skanne EAN-strekkoder</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your microphone</string>
     <key>UILaunchStoryboardName</key>

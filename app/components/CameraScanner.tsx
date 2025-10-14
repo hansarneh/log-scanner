@@ -27,6 +27,10 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
   useEffect(() => {
     if (!visible) return
     
+    // Midlertidige logger for debugging
+    console.log('Types:', Camera.Constants.BarCodeType)
+    Camera.getCameraPermissionsAsync().then(p => console.log('Permission:', p))
+    
     const requestPermission = async () => {
       try {
         const { status } = await Camera.requestCameraPermissionsAsync()
@@ -161,6 +165,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
         ref={(r) => (cameraRef.current = r)}
         style={StyleSheet.absoluteFill}
         ratio="16:9"
+        autoFocus={Camera.Constants.AutoFocus.on}
         // NB: SDK 50 bruker "onBarCodeScanned" (ikke modern-API)
         onBarCodeScanned={
           scanningEnabled
@@ -169,7 +174,10 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
         }
         // Begrens til EAN-typer for bedre ytelse
         barCodeScannerSettings={{
-          barCodeTypes: ['ean13', 'ean8', 'code128', 'code39', 'upc_a', 'upc_e'],
+          barCodeTypes: [
+            Camera.Constants.BarCodeType.ean13,
+            Camera.Constants.BarCodeType.ean8
+          ],
         }}
       />
       
