@@ -178,6 +178,8 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({
         style={StyleSheet.absoluteFill}
         ratio="16:9"
         autoFocus={Camera.Constants.AutoFocus.on}
+        focusDepth={0}
+        zoom={0}
         // NB: SDK 50 bruker "onBarCodeScanned" (ikke modern-API)
         onBarCodeScanned={
           scanningEnabled
