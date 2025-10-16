@@ -1,6 +1,6 @@
 # Fair Scanner
 
-A production-ready React Native app for the Zebra MC2200 Android device, designed for trade fairs to scan EAN barcodes, build orders, and export CSV files with email delivery.
+A production-ready React Native app designed for trade fairs to scan EAN barcodes, build orders, and export CSV files with email delivery.
 
 ## Features
 
