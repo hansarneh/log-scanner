@@ -1,10 +1,10 @@
 # Fair Scanner
 
-A production-ready React Native app designed for trade fairs to scan EAN barcodes, build orders, and export CSV files with email delivery.
+A production-ready React Native app designed for trade fairs to scan EAN barcodes, build orders, and export CSV files with email delivery. This app is no longer designed for Zebra devices and is native-only.
 
 ## Features
 
-- **Barcode Scanning**: EAN-13/EAN-8 support via Zebra DataWedge
+- **Barcode Scanning**: EAN-13/EAN-8 support
 - **Offline-First**: SQLite local storage with offline order management
 - **Order Management**: Create, edit, and finalize orders with customer details
 - **Product Cache**: Local product database with intelligent Supabase sync (timestamp-based updates)
@@ -17,7 +17,6 @@ A production-ready React Native app designed for trade fairs to scan EAN barcode
 - **Frontend**: React Native (Expo + Dev Client), TypeScript
 - **Database**: Supabase (PostgreSQL + RLS), SQLite (local)
 - **State Management**: Zustand
-- **Barcode**: Zebra DataWedge integration
 - **Storage**: Supabase Storage for CSV exports
 - **Email**: Edge Function with email delivery (Resend placeholder)
 
@@ -25,7 +24,6 @@ A production-ready React Native app designed for trade fairs to scan EAN barcode
 
 - Node.js 18+ and npm
 - Android Studio (for Android development)
-- Zebra MC2200 device or Android emulator
 - Supabase account and project
 
 ## Quick Start
@@ -104,31 +102,6 @@ npm run seed
 npx expo run:android
 ```
 
-## Zebra DataWedge Setup
-
-### Overview
-
-DataWedge is Zebra's barcode scanning solution. The app is configured to receive keystroke output from DataWedge.
-
-### Step-by-Step Setup
-
-1. **Open DataWedge** on your MC2200
-2. **Create Profile**: Tap `+` → Name: `FairScanner`
-3. **Associate App**: Set to `com.fairscanner.app`
-4. **Barcode Input**: Enable with EAN-13/EAN-8 symbologies
-5. **Keystroke Output**: Enable with "Send Enter Key After Data"
-
-### Detailed Instructions
-
-See [DataWedge-Profile.md](android-notes/DataWedge-Profile.md) for comprehensive setup instructions, troubleshooting, and advanced configuration options.
-
-### Testing
-
-1. Open the Fair Scanner app
-2. Navigate to Scan screen
-3. Scan any EAN barcode
-4. Verify haptic feedback and product display
-
 ## App Usage
 
 ### 1. New Order
@@ -170,7 +143,7 @@ See [DataWedge-Profile.md](android-notes/DataWedge-Profile.md) for comprehensive
 │   └── lib/              # Utilities and services
 ├── edge/                  # Supabase Edge Functions
 ├── supabase/             # Database schema and policies
-├── android-notes/        # Zebra setup documentation
+├── android-notes/        # Documentation
 └── scripts/              # Development and deployment scripts
 ```
 
@@ -235,20 +208,6 @@ For production releases, you'll need to configure Android signing:
 ## Troubleshooting
 
 ### Common Issues
-
-#### Scanner Not Working
-
-1. **Check DataWedge Profile**: Ensure profile is associated with app
-2. **Verify Permissions**: App needs VIBRATE permission
-3. **Test Scanner**: Try scanning in text editor first
-4. **Reboot Device**: Sometimes needed after DataWedge changes
-
-#### App Crashes
-
-1. **Check Logs**: Use `adb logcat` for Android
-2. **Clear Cache**: Uninstall and reinstall app
-3. **Verify Environment**: Check `.env` configuration
-4. **Database Issues**: Clear app data if SQLite errors occur
 
 #### Sync Problems
 
@@ -358,13 +317,6 @@ npm test -- --testPathPattern=orderStore
 - [Expo Documentation](https://docs.expo.dev/)
 - [React Native Documentation](https://reactnative.dev/)
 - [Supabase Documentation](https://supabase.com/docs)
-- [Zebra DataWedge Documentation](https://developer.zebra.com/wikis/datawedge)
-
-### Community
-
-- [Expo Discord](https://chat.expo.dev/)
-- [React Native Community](https://github.com/react-native-community)
-- [Supabase Discord](https://discord.supabase.com/)
 
 ### Issues
 
@@ -383,9 +335,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Expo Team** for the excellent development platform
 - **Supabase** for the powerful backend services
-- **Zebra Technologies** for the MC2200 device
 - **React Native Community** for the mobile framework
-
----
-
-**Note**: This app is designed specifically for trade fair use with Zebra MC2200 devices. Ensure proper testing on target hardware before production deployment.
